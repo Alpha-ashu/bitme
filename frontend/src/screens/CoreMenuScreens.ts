@@ -834,7 +834,10 @@ export function renderAppShell(root: HTMLElement, ctx: AppContext): void {
           <div class="wallet-chip tickets" title="Tickets">${svgTicket(15)} <span>${fmtNum(p.tickets || 0)}</span></div>
         </div>
         <div class="topbar-actions">
-          <button class="topbar-icon-btn" data-nav="inventory" aria-label="Armory">${imgBundleSprite('pirate_chest', 22)}</button>
+          <button class="topbar-icon-btn has-badge" data-nav="rewards" aria-label="Reward Box &amp; Boosts" title="Reward Box">
+            ${imgBundleSprite('pirate_chest', 22)}
+            ${(state.rewardBox?.unclaimedCount || 0) > 0 ? `<span class="topbar-badge">${state.rewardBox.unclaimedCount}</span>` : ''}
+          </button>
           <button class="topbar-icon-btn" data-nav="settings" aria-label="Settings">${svgNavIcon('settings', 16)}</button>
           <button id="top-auth-btn" class="topbar-profile-pill">
             ${svgAvatarBadge(p.avatar, state.selectedSkin, state.equippedAccessory, 26)}

@@ -181,39 +181,48 @@ test('Quest Engine: NPC interact, Later, Skip (0 reward), Accept, 1-quest limit,
   assert.equal(accOther.status, 400);
   assert.match(accOther.json.error, /before accepting another main quest/i);
 
-  // 6) Advance Level 1 objective (collect 5 foods) -> transitions ACTIVE -> CLAIMABLE
+  // 6) Advance Level 1 objective (collect 5 foods) -> AUTO-CLAIMS directly into Reward Box & unlocks Level 2!
   const activeId = acc1.json.session.sessionId;
   let lastUpd = null;
   for (let i = 0; i < 5; i++) {
     lastUpd = QuestEngineService.recordGameplayMetric(p.user.id, 'any_food', 1);
   }
-  assert.ok(lastUpd?.completed, 'Level 1 should reach CLAIMABLE after 5 foods');
-  assert.equal(lastUpd.session.state, 'CLAIMABLE');
+  assert.ok(lastUpd?.completed, 'Level 1 should complete after 5 foods');
+  assert.equal(lastUpd.autoClaimedToBox, true, 'Completed quest must auto-claim into Reward Box');
+  assert.equal(lastUpd.session.state, 'CLAIMED');
+  assert.equal(lastUpd.npcQuota?.completedInCycle, 1, 'Quest Master task progress must increment to 1/5');
+  assert.equal(lastUpd.nextUnlockedLevel, 2, 'Completing Lv.1 must immediately unlock Lv.2');
 
-  // Reconnect check: active main quest persists in SQLite
-  const restored = QuestEngineService.getActiveMainQuest(p.user.id);
-  assert.equal(restored.sessionId, activeId);
-  assert.equal(restored.state, 'CLAIMABLE');
-
-  // 7) Claim reward atomically + verify Level 2 unlocked
-  const starsBeforeClaim = db.getProfile(p.user.id).stars;
-  const claim1 = await api('/api/adventure/quest/claim', {
-    method: 'POST', headers, body: JSON.stringify({ sessionId: activeId }),
+  // Verify Reward Box holds the auto-deposited reward & collecting is atomic/idempotent!
+  const box1 = await api('/api/reward-box', { headers });
+  assert.equal(box1.status, 200);
+  assert.equal(box1.json.unclaimedCount, 1, 'Reward Box should hold 1 unclaimed quest reward');
+  const boxItemId = box1.json.items[0].id;
+  const starsBeforeCollect = db.getProfile(p.user.id).stars;
+  const col1 = await api('/api/reward-box/collect', {
+    method: 'POST', headers, body: JSON.stringify({ itemId: boxItemId }),
   });
-  assert.equal(claim1.status, 200);
-  assert.equal(claim1.json.ok, true);
-  assert.equal(Boolean(claim1.json.alreadyClaimed), false);
-  const starsAfterClaim = db.getProfile(p.user.id).stars;
-  assert.ok(starsAfterClaim > starsBeforeClaim, 'Claim must grant stars');
-  assert.equal(claim1.json.overview.axes.highestUnlockedLevel, 2, 'Completing Lv.1 must unlock Lv.2');
+  assert.equal(col1.status, 200);
+  assert.equal(col1.json.ok, true);
+  assert.equal(col1.json.alreadyCollected, false);
+  const starsAfterCollect = db.getProfile(p.user.id).stars;
+  assert.ok(starsAfterCollect > starsBeforeCollect, 'Collecting from Reward Box must credit Stars to wallet');
 
-  // 8) Duplicate claim is idempotent and awards 0 extra stars
+  // Duplicate collect is idempotent and awards 0 extra stars
+  const col2 = await api('/api/reward-box/collect', {
+    method: 'POST', headers, body: JSON.stringify({ itemId: boxItemId }),
+  });
+  assert.equal(col2.status, 200);
+  assert.equal(col2.json.alreadyCollected, true);
+  assert.equal(db.getProfile(p.user.id).stars, starsAfterCollect, 'Duplicate Reward Box collect must award 0 extra stars');
+
+  // Duplicate legacy /quest/claim call on already auto-claimed quest is safely idempotent
   const claim2 = await api('/api/adventure/quest/claim', {
     method: 'POST', headers, body: JSON.stringify({ sessionId: activeId }),
   });
   assert.equal(claim2.status, 200);
   assert.equal(claim2.json.alreadyClaimed, true);
-  assert.equal(db.getProfile(p.user.id).stars, starsAfterClaim, 'Duplicate claim must not double-grant rewards');
+  assert.equal(db.getProfile(p.user.id).stars, starsAfterCollect, 'Duplicate claim must not double-grant rewards');
 });
 
 // ============================================================================
@@ -287,14 +296,9 @@ test('Educational Quiz Engine: curated bank, zero answer leakage, validation, gr
 
   assert.equal(lastSubmit.completed, true);
   assert.equal(lastSubmit.passed, true);
-  assert.equal(lastSubmit.questUpdate?.session?.state, 'CLAIMABLE');
-
-  // Claim Level 3 -> unlocks Level 4!
-  const claim = await api('/api/adventure/quest/claim', {
-    method: 'POST', headers, body: JSON.stringify({ sessionId: acc.json.session.sessionId }),
-  });
-  assert.equal(claim.status, 200);
-  assert.equal(claim.json.overview.axes.highestUnlockedLevel, 4);
+  assert.equal(lastSubmit.questUpdate?.autoClaimedToBox, true);
+  assert.equal(lastSubmit.questUpdate?.session?.state, 'CLAIMED');
+  assert.equal(lastSubmit.questUpdate?.nextUnlockedLevel, 4, 'Completing Lv.3 quiz auto-unlocks Lv.4');
 
   // Adaptive difficulty check: high recent accuracy pushes difficulty upward
   const adapted = QuestionBankService.computeAdaptiveDifficulty(p.user.id, 1);
@@ -353,17 +357,14 @@ test('1,000-Level Campaign: 10 worlds, 7 legacy kingdoms preserved, Lv.10/20/100
   assert.equal(mid10.stageIndex, 1, 'Boss Lv.10 should advance to Stage 2 switches');
   assert.equal(mid10.currentStage.kind, 'switches');
 
-  // Stage 2: visit both sanctum switch coordinates via spatial tick -> CLAIMABLE
+  // Stage 2: visit both sanctum switch coordinates via spatial tick -> auto-claims to Reward Box!
+  let bossRes = null;
   for (const sw of mid10.currentStage.switches) {
-    QuestEngineService.recordSpatialTick(p.user.id, sw.x, sw.y, 0.5);
+    bossRes = QuestEngineService.recordSpatialTick(p.user.id, sw.x, sw.y, 0.5);
   }
-  const done10 = QuestEngineService.getActiveMainQuest(p.user.id);
-  assert.equal(done10.state, 'CLAIMABLE');
-  const claim10 = await api('/api/adventure/quest/claim', {
-    method: 'POST', headers, body: JSON.stringify({ sessionId: acc10.json.session.sessionId }),
-  });
-  assert.equal(claim10.status, 200);
-  assert.equal(claim10.json.overview.axes.bossCheckpointsCleared, 1);
+  assert.equal(bossRes?.completed, true);
+  assert.equal(bossRes?.autoClaimedToBox, true);
+  assert.equal(AdventureProgressionService.getOverview(p.user.id).axes.bossCheckpointsCleared, 1);
 
   // Replay throttling check: replaying Lv.10 grants reduced stars (30%) and 0 extra tickets
   const replay10 = AdventureProgressionService.recordLevelCompletion(p.user.id, 10);
@@ -380,12 +381,11 @@ test('1,000-Level Campaign: 10 worlds, 7 legacy kingdoms preserved, Lv.10/20/100
   // Visiting waypoint #2 out of order should NOT advance progress
   QuestEngineService.recordSpatialTick(p.user.id, wps[1].x, wps[1].y, 0.2);
   assert.equal(QuestEngineService.getActiveMainQuest(p.user.id).progress, 0);
-  // Visiting in exact order 0 -> 1 -> 2 completes quest
-  for (const wp of wps) QuestEngineService.recordSpatialTick(p.user.id, wp.x, wp.y, 0.2);
-  assert.equal(QuestEngineService.getActiveMainQuest(p.user.id).state, 'CLAIMABLE');
-  await api('/api/adventure/quest/claim', {
-    method: 'POST', headers, body: JSON.stringify({ sessionId: acc5.json.session.sessionId }),
-  });
+  // Visiting in exact order 0 -> 1 -> 2 completes quest & deposits to Reward Box!
+  let navDone = null;
+  for (const wp of wps) navDone = QuestEngineService.recordSpatialTick(p.user.id, wp.x, wp.y, 0.2);
+  assert.equal(navDone?.completed, true);
+  assert.equal(navDone?.autoClaimedToBox, true);
 
   // Level 100 & Level 1,000 Major Milestone + Sovereign Eclipse Finale unlocks
   const res100 = AdventureProgressionService.recordLevelCompletion(p.user.id, 100);
@@ -609,3 +609,144 @@ test('Admin CMS & RPG Analytics: RBAC guard, Question CRUD, Level Override previ
   assert.ok(actions.includes('question_upserted'));
   assert.ok(actions.includes('content_override_saved'));
 });
+
+// ============================================================================
+// 7. QUEST MASTER 5-TASK QUOTA + 30-MINUTE COOLDOWN + POWER-UP SHOP
+// ============================================================================
+test('Quest Master 5-task quota, 30-min cooldown enforcement, auto-reset & Boost/Shield Power-Up purchase/use', async () => {
+  const p = await createPlayer('QuotaMaster01');
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${p.token}` };
+
+  // Complete 5 tasks with Elder Moss (npc_elder_moss)
+  for (let i = 1; i <= 5; i++) {
+    const acc = await api('/api/adventure/quest/accept', {
+      method: 'POST', headers, body: JSON.stringify({ levelNumber: 1, npcId: 'npc_elder_moss' }),
+    });
+    assert.equal(acc.status, 200, `Task ${i}/5 with Elder Moss must succeed`);
+    for (let f = 0; f < 5; f++) QuestEngineService.recordGameplayMetric(p.user.id, 'any_food', 1);
+  }
+
+  // Quota should now be 5/5 and ON 30-MINUTE COOLDOWN!
+  const qStatus = QuestEngineService.getNpcQuota(p.user.id, 'npc_elder_moss');
+  assert.equal(qStatus.completedInCycle, 5);
+  assert.equal(qStatus.totalCompleted, 5);
+  assert.equal(qStatus.onCooldown, true);
+  assert.ok(qStatus.cooldownRemainingSec > 1700, '30-minute cooldown must be active (~1800s)');
+
+  // Encounter with Elder Moss shows resting status & canAccept = false
+  const encCooldown = QuestEngineService.buildNpcEncounter(p.user.id, 'npc_elder_moss');
+  assert.equal(encCooldown.canAccept, false);
+  assert.equal(encCooldown.npcQuota.onCooldown, true);
+
+  // Attempting a 6th quest from Elder Moss is rejected with 429!
+  const blocked6 = await api('/api/adventure/quest/accept', {
+    method: 'POST', headers, body: JSON.stringify({ levelNumber: 1, npcId: 'npc_elder_moss' }),
+  });
+  assert.equal(blocked6.status, 429);
+  assert.ok(blocked6.json.cooldownRemainingSec > 1700);
+
+  // A DIFFERENT Quest Master (Guard Bram) is NOT affected by Elder Moss's cooldown
+  const otherNpc = await api('/api/adventure/quest/accept', {
+    method: 'POST', headers, body: JSON.stringify({ levelNumber: 1, npcId: 'npc_guard_bram' }),
+  });
+  assert.equal(otherNpc.status, 200, 'Other Quest Masters remain available during Elder Moss cooldown');
+  await api('/api/adventure/quest/abandon', { method: 'POST', headers });
+
+  // Simulate 31 minutes elapsing -> Elder Moss quota automatically resets to 0/5!
+  const after31m = QuestEngineService.getNpcQuota(p.user.id, 'npc_elder_moss', Date.now() + 31 * 60 * 1000);
+  assert.equal(after31m.onCooldown, false);
+  assert.equal(after31m.completedInCycle, 0);
+  assert.equal(after31m.totalCompleted, 5, 'Lifetime totalCompleted is preserved after cycle reset');
+
+  // Collect all 5 auto-deposited Reward Box entries -> spend Stars to buy Boost & Shield charges!
+  const colAll = await api('/api/reward-box/collect-all', { method: 'POST', headers });
+  assert.equal(colAll.status, 200);
+  assert.equal(colAll.json.count, 5);
+  assert.ok(colAll.json.collected.stars > 0);
+
+  const buyBoost = await api('/api/shop/purchase-powerup', {
+    method: 'POST', headers, body: JSON.stringify({ powerupId: 'pw_boost' }),
+  });
+  assert.equal(buyBoost.status, 200);
+  assert.equal(buyBoost.json.owned, 1);
+
+  const buyShield = await api('/api/shop/purchase-powerup', {
+    method: 'POST', headers, body: JSON.stringify({ powerupId: 'pw_shield' }),
+  });
+  assert.equal(buyShield.status, 200);
+  assert.equal(buyShield.json.owned, 1);
+
+  const useShield = await api('/api/player/use-powerup', {
+    method: 'POST', headers, body: JSON.stringify({ powerupId: 'pw_shield' }),
+  });
+  assert.equal(useShield.status, 200);
+  assert.equal(useShield.json.remaining, 0);
+});
+
+// ============================================================================
+// 8. SAFE FRESH-AREA QUEST DEPLOYMENT, TACTICAL MAP PLANNING PAUSE & 2x AD REWARD
+// ============================================================================
+test('Safe Fresh-Area Deployment on Quest Accept, Tactical Map Safe Planning Pause & 2x Watch Ad Double Reward', async () => {
+  // 1) Safe Fresh-Area Deployment & Tactical Map Planning Immunity
+  const sess = new GameSessionService('safe_deploy_map_test', 'classic', { kingdom: 1 });
+  sess.stop();
+  const st = sess.getState();
+  Object.keys(st.snakes).forEach(id => delete st.snakes[id]);
+
+  const hero = sess.registerPlayer('hero_1', 'Hero');
+  const bully = sess.registerPlayer('bully_1', 'Bully');
+  hero.score = 100; bully.score = 5000;
+  hero.head = { x: 3000, y: 3000 };
+  hero.body = Array.from({ length: 9 }, (_, i) => ({ x: 3000 - i * 14, y: 3000 }));
+  bully.head = { x: 3010, y: 3000 }; // right on top of hero!
+  bully.body = Array.from({ length: 9 }, (_, i) => ({ x: 3010 - i * 14, y: 3000 }));
+
+  // Tactical Map Safe Planning Pause: bully overlapping hero MUST NOT kill hero while map is open!
+  assert.equal(sess.setPlayerMapPlanning('hero_1', true), true);
+  assert.equal(hero.isMapPlanning, true);
+  assert.equal(hero.isPaused, true);
+  sess.stepForTest();
+  assert.equal(hero.isAlive, true, 'Enemy snake MUST NOT attack/kill player while Tactical Map is open');
+
+  // Closing Tactical Map resumes & grants 1.5s grace shield
+  assert.equal(sess.setPlayerMapPlanning('hero_1', false), true);
+  assert.equal(hero.isMapPlanning, false);
+  assert.ok(hero.shieldTimer >= 1.5, 'Closing Tactical Map must grant grace shield');
+
+  // Fresh-Area Deployment when accepting a quest: relocates hero far away from Bully + grants 4.5s shield!
+  const dep = sess.deployPlayerToSafeQuestArea('hero_1');
+  assert.equal(dep.ok, true);
+  assert.ok(dep.minEnemyDistance >= 500, `Expected fresh deploy >= 500px from enemy, got ${dep.minEnemyDistance}`);
+  assert.ok(hero.shieldTimer >= 4.5, 'Fresh quest deploy must grant 4.5s shield protection');
+
+  // 2) Watch Ad 2x Double Match Reward
+  const p = await createPlayer('AdDoubler01');
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${p.token}` };
+  // Record a real match earning stars & XP
+  const sum = await api('/api/match/summary', {
+    method: 'POST', headers,
+    body: JSON.stringify({ mode: 'battle_royale', score: 850, kills: 2, placement: 1, survivalSeconds: 120 }),
+  });
+  assert.equal(sum.status, 200);
+  const runStars = sum.json.earnedStars;
+  const runXp = sum.json.earnedXP;
+  assert.ok(runStars > 0 && runXp > 0);
+
+  // Start rewarded ad token, wait min watch time (200ms in test env? Let's pass env or use server minWatchMs)
+  const startAd = await api('/api/ads/reward-start', { method: 'POST', headers, body: JSON.stringify({}) });
+  assert.equal(startAd.status, 200);
+  // Fast-forward token issued_at in SQLite for unit test speed without sleeping 4 seconds
+  db.getRawDb().prepare('UPDATE ad_reward_tokens SET issued_at = issued_at - 10000 WHERE id = ?').run(startAd.json.tokenId);
+
+  const starsBeforeDouble = db.getProfile(p.user.id).stars;
+  const dbl = await api('/api/ads/claim', {
+    method: 'POST', headers,
+    body: JSON.stringify({ adToken: startAd.json.tokenId, doubleMatch: true }),
+  });
+  assert.equal(dbl.status, 200);
+  assert.equal(dbl.json.doubled, true);
+  assert.ok(dbl.json.bonusStars >= runStars, 'Watch Ad 2x must grant at least the full run stars again');
+  assert.equal(dbl.json.bonusXp, runXp, 'Watch Ad 2x must grant the exact run XP again');
+  assert.equal(db.getProfile(p.user.id).stars, starsBeforeDouble + dbl.json.bonusStars);
+});
+

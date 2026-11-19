@@ -1,5 +1,6 @@
 import { api, fmtNum } from '../api/ApiClient';
 import {
+  imgBundleSprite,
   svgAccessoryPreview,
   svgAvatarBadge,
   svgCloseX,
@@ -11,9 +12,14 @@ import {
 import { esc } from '../utils/escapeHtml';
 import { AppContext, DEFAULT_ACCESSORIES, getViewportTier, SKIN_FAMILIES } from './types';
 
+function stripLeadEmoji(raw: string): string {
+  return String(raw || '').replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F\u200D\s]+/gu, '').trim() || String(raw || '');
+}
+
 const colUi = {
   invPage: 0,
   missionPage: 0,
+  rewardTab: 'box' as 'box' | 'powerups' | 'catalog',
   rewardPage: 0,
   lbPage: 0,
   friendTab: 'friends' as 'friends' | 'requests',
@@ -326,7 +332,7 @@ export function renderMissionsPage(ctx: AppContext): string {
             <div class="panel mission-card ${a.isUnlocked ? 'done' : ''}">
               <div class="m-top">
                 <span class="m-icon">${svgTrophyMedallion(1, 30)}</span>
-                <div><strong>${esc(a.title)}</strong><p>${esc(a.description)}</p></div>
+                <div><strong>${esc(stripLeadEmoji(a.title))}</strong><p>${esc(a.description)}</p></div>
                 <span class="pill">${esc(a.tier)}</span>
               </div>
               <div class="hud-bar"><div style="width:${pct}%"></div></div>
@@ -408,18 +414,80 @@ export function renderRewardsPage(ctx: AppContext): string {
   const { state } = ctx;
   const tier = getViewportTier();
   const stars = state.profile?.stars ?? 0;
+  const rbox = state.rewardBox || { items: [], unclaimedCount: 0, totals: { stars: 0, xp: 0, evoXp: 0, tickets: 0 }, powerups: [] };
   const rewards = state.rewards || [];
-  const perPage = tier === 'tiny' || tier === 'landscape' ? 2 : tier === 'mobile' ? 2 : 3;
-  const pages = Math.max(1, Math.ceil(rewards.length / perPage));
-  colUi.rewardPage = Math.max(0, Math.min(colUi.rewardPage, pages - 1));
-  const slice = rewards.slice(colUi.rewardPage * perPage, colUi.rewardPage * perPage + perPage);
+  const inv = state.profile?.inventory || {};
+  const powerups = rbox.powerups?.length ? rbox.powerups : [
+    { id: 'pw_boost', name: 'Speed Boost Charge', shortName: 'Boost', description: '+10s turbo speed in-match.', costStars: 60, spriteKey: 'ui_bolt_wood', owned: Number(inv.pw_boost || 0) },
+    { id: 'pw_shield', name: 'Guard Shield Charge', shortName: 'Shield', description: '+10s protective shield in-match.', costStars: 80, spriteKey: 'ui_heart_wood', owned: Number(inv.pw_shield || 0) },
+    { id: 'pw_super', name: 'Super Surge Charge', shortName: 'Super', description: '+8s giant magnet & speed aura.', costStars: 120, spriteKey: 'farm_sunflower', owned: Number(inv.pw_super || 0) },
+  ];
 
-  return `
-    <div class="screen-fill">
-      <div class="page-hdr">
-        <h2>Rewards</h2>
-        <span class="pill">${fmtNum(stars)}★</span>
+  let bodyHtml = '';
+  let pager = '';
+
+  if (colUi.rewardTab === 'box') {
+    const items = rbox.items || [];
+    const perPage = tier === 'tiny' || tier === 'landscape' ? 2 : tier === 'mobile' ? 3 : 4;
+    const pages = Math.max(1, Math.ceil(items.length / perPage));
+    colUi.rewardPage = Math.max(0, Math.min(colUi.rewardPage, pages - 1));
+    const slice = items.slice(colUi.rewardPage * perPage, colUi.rewardPage * perPage + perPage);
+
+    bodyHtml = `
+      <div class="panel bonus-strip">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          ${imgBundleSprite('pirate_chest', 36)}
+          <div style="min-width:0">
+            <strong style="font-size:13.5px;display:block">Quest Reward Box (${rbox.unclaimedCount} Ready)</strong>
+            <p class="subtitle">${rbox.unclaimedCount > 0 ? `+${fmtNum(rbox.totals.stars)} Stars · +${fmtNum(rbox.totals.xp)} XP waiting to collect` : 'Completed quests auto-deposit rewards here!'}</p>
+          </div>
+        </div>
+        <button id="btn-rbox-collect-all" class="btn btn-xs ${rbox.unclaimedCount > 0 ? 'btn-gold' : 'btn-soft'}" ${rbox.unclaimedCount < 1 ? 'disabled' : ''}>
+          Collect All
+        </button>
       </div>
+      <div class="card-grid-2">
+        ${slice.map((item: any) => `
+          <div class="panel mission-card ${item.status === 'collected' ? 'done' : ''}">
+            <div class="m-top">
+              <span class="m-icon">${imgBundleSprite('ui_star_wood', 24)}</span>
+              <div style="min-width:0">
+                <strong class="uname-ellipsis" style="display:block">${esc(stripLeadEmoji(item.title))}</strong>
+                <p>+${fmtNum(item.stars)} Stars · +${fmtNum(item.xp)} XP${item.tickets ? ` · +${item.tickets} Tickets` : ''}</p>
+              </div>
+              ${item.status === 'collected'
+                ? `<span class="pill pill-live">Collected ✓</span>`
+                : `<button class="btn btn-xs btn-gold" data-rbox-collect="${esc(item.id)}">Collect</button>`}
+            </div>
+          </div>
+        `).join('') || `<div class="panel empty-msg">Complete any Quest to receive rewards automatically in your Reward Box, then spend Stars on Boost &amp; Shield charges!</div>`}
+      </div>
+    `;
+    pager = pagerHtml('rw', colUi.rewardPage, pages);
+  } else if (colUi.rewardTab === 'powerups') {
+    bodyHtml = `
+      <div class="card-grid-3" style="grid-template-columns:repeat(${tier === 'tiny' ? 1 : tier === 'mobile' ? 1 : 3},minmax(0,1fr))">
+        ${powerups.map((pw: any) => `
+          <div class="panel" style="display:flex;flex-direction:column;gap:7px;justify-content:space-between">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              ${imgBundleSprite(pw.spriteKey || 'ui_bolt_wood', 36)}
+              <span class="pill pill-live">Owned ×${pw.owned || 0}</span>
+            </div>
+            <strong>${esc(pw.name)}</strong>
+            <p class="subtitle">${esc(pw.description)}</p>
+            <button class="btn btn-xs btn-gold btn-block" data-buy-pw="${esc(pw.id)}" ${stars < pw.costStars ? 'disabled' : ''}>
+              ${stars < pw.costStars ? `Need ${pw.costStars} Stars` : `Buy · ${pw.costStars} Stars`}
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else {
+    const perPage = tier === 'tiny' || tier === 'landscape' ? 2 : tier === 'mobile' ? 2 : 3;
+    const pages = Math.max(1, Math.ceil(rewards.length / perPage));
+    colUi.rewardPage = Math.max(0, Math.min(colUi.rewardPage, pages - 1));
+    const slice = rewards.slice(colUi.rewardPage * perPage, colUi.rewardPage * perPage + perPage);
+    bodyHtml = `
       <div class="card-grid-3" style="grid-template-columns:repeat(${tier === 'tiny' || tier === 'mobile' ? 1 : tier === 'landscape' ? 2 : 3},minmax(0,1fr))">
         ${slice.map(r => `
           <div class="panel" style="display:flex;flex-direction:column;gap:7px;justify-content:space-between">
@@ -427,19 +495,35 @@ export function renderRewardsPage(ctx: AppContext): string {
               ${svgFoodPreview('golden_chest', 36)}
               <span class="pill">${esc(r.category)}</span>
             </div>
-            <strong>${esc(r.title)}</strong>
+            <strong>${esc(stripLeadEmoji(r.title))}</strong>
             <p class="subtitle">${esc(r.description)}</p>
             <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800">
               <span>Lv.${r.minLevel}+ · ${r.stock < 0 ? '∞' : r.stock} left</span>
-              <b>${fmtNum(r.starCost)} ★</b>
+              <b>${fmtNum(r.starCost)} Stars</b>
             </div>
             <button class="btn btn-xs btn-gold btn-block" data-redeem-rw="${esc(r.id)}" ${!r.available || stars < r.starCost ? 'disabled' : ''}>
-              ${r.soldOut ? 'Sold Out' : !r.available ? 'Unavailable' : stars < r.starCost ? `Need ${fmtNum(r.starCost)}★` : `Redeem`}
+              ${r.soldOut ? 'Sold Out' : !r.available ? 'Unavailable' : stars < r.starCost ? `Need ${fmtNum(r.starCost)} Stars` : `Redeem`}
             </button>
           </div>
-        `).join('') || `<div class="panel empty-msg">Loading rewards…</div>`}
+        `).join('') || `<div class="panel empty-msg">Loading vouchers…</div>`}
       </div>
-      ${pagerHtml('rw', colUi.rewardPage, pages)}
+    `;
+    pager = pagerHtml('rw', colUi.rewardPage, pages);
+  }
+
+  return `
+    <div class="screen-fill">
+      <div class="page-hdr">
+        <h2>Reward Box</h2>
+        <span class="pill">${fmtNum(stars)} Stars</span>
+      </div>
+      <div class="seg-pill" style="align-self:flex-start">
+        <button class="seg-btn ${colUi.rewardTab === 'box' ? 'active' : ''}" data-rw-tab="box">Box (${rbox.unclaimedCount})</button>
+        <button class="seg-btn ${colUi.rewardTab === 'powerups' ? 'active' : ''}" data-rw-tab="powerups">Boost &amp; Shield</button>
+        <button class="seg-btn ${colUi.rewardTab === 'catalog' ? 'active' : ''}" data-rw-tab="catalog">Vouchers</button>
+      </div>
+      ${bodyHtml}
+      ${pager}
     </div>
   `;
 }
@@ -642,7 +726,7 @@ export function renderEventsPage(ctx: AppContext): string {
             <div class="mission-card">
               <div class="m-top">
                 <span class="m-icon">${svgFoodPreview('crystal', 24)}</span>
-                <div><strong>${esc(e.name)}</strong><p>${esc(e.description)}</p></div>
+                <div><strong>${esc(stripLeadEmoji(e.name))}</strong><p>${esc(e.description)}</p></div>
                 <span class="pill ${e.live ? 'pill-live' : ''}">${e.live ? 'LIVE' : 'Soon'}</span>
               </div>
               <small>${esc(e.rewardHint || '')}</small>
@@ -703,6 +787,42 @@ export function bindCollectionSocialEvents(root: HTMLElement, ctx: AppContext) {
     const r = await api('/api/missions/daily-bonus', { method: 'POST' });
     ctx.toast(r.data?.message || 'Claimed Daily Bonus Egg!');
     await Promise.all([ctx.refreshProfile(), ctx.refreshCollectionData()]);
+  });
+
+  root.querySelectorAll<HTMLElement>('[data-rw-tab]').forEach(b => {
+    b.addEventListener('click', () => {
+      colUi.rewardTab = b.dataset.rwTab as any;
+      colUi.rewardPage = 0;
+      ctx.render();
+    });
+  });
+  root.querySelector('#btn-rbox-collect-all')?.addEventListener('click', async () => {
+    const r = await api('/api/reward-box/collect-all', { method: 'POST' });
+    if (!r.ok) { ctx.toast(r.data?.error || 'Nothing to collect'); return; }
+    if (r.data?.profile) ctx.state.profile = r.data.profile;
+    if (r.data?.rewardBox) ctx.state.rewardBox = r.data.rewardBox;
+    ctx.toast(`Collected ${r.data.count || 0} rewards (+${fmtNum(r.data.collected?.stars || 0)} Stars)!`);
+    ctx.render();
+  });
+  root.querySelectorAll<HTMLElement>('[data-rbox-collect]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const r = await api('/api/reward-box/collect', { method: 'POST', body: JSON.stringify({ itemId: b.dataset.rboxCollect }) });
+      if (!r.ok) { ctx.toast(r.data?.error || 'Could not collect'); return; }
+      if (r.data?.profile) ctx.state.profile = r.data.profile;
+      if (r.data?.rewardBox) ctx.state.rewardBox = r.data.rewardBox;
+      ctx.toast(`Collected +${fmtNum(r.data.collected?.stars || 0)} Stars!`);
+      ctx.render();
+    });
+  });
+  root.querySelectorAll<HTMLElement>('[data-buy-pw]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const r = await api('/api/shop/purchase-powerup', { method: 'POST', body: JSON.stringify({ powerupId: b.dataset.buyPw }) });
+      if (!r.ok) { ctx.toast(r.data?.error || 'Purchase failed'); return; }
+      if (r.data?.profile) ctx.state.profile = r.data.profile;
+      if (r.data?.rewardBox) ctx.state.rewardBox = r.data.rewardBox;
+      ctx.toast(r.data?.message || 'Power-up purchased!');
+      ctx.render();
+    });
   });
 
   root.querySelectorAll<HTMLElement>('[data-redeem-rw]').forEach(b => {

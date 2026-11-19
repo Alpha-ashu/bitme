@@ -1228,6 +1228,7 @@ class AnacondaParkApp {
           onBindCanvas: (canvas) => {
             if (!this.renderer) this.renderer = new Renderer(canvas);
             else this.renderer.attach(canvas);
+            this.renderer.setNpcQuotas(this.state.npcQuotas);
             this.applySettingsToDom();
             this.applyMatchTheme();
           },

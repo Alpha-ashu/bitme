@@ -1904,9 +1904,63 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   gap: 7px;
 }
 .npc-pop-subactions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 8px;
+}
+.npc-pop-subactions > * {
+  flex: 1;
+}
+
+/* Quest Master 5-task quota & 30-min cooldown bar */
+.npc-quota-bar {
+  background: linear-gradient(180deg, #f0fdf4, #dcfce7);
+  border: 2px solid #86efac;
+  border-radius: 13px;
+  padding: 7px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.npc-quota-bar.resting {
+  background: linear-gradient(180deg, #fffbeb, #fef3c7);
+  border-color: #f59e0b;
+}
+.npc-quota-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #065f46;
+}
+.npc-quota-bar.resting .npc-quota-top { color: #92400e; }
+.npc-quota-pips {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+.qpip {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.16);
+}
+.qpip.done {
+  background: linear-gradient(90deg, #10b981, #059669);
+  box-shadow: 0 1px 4px rgba(5, 150, 105, 0.35);
+}
+.npc-quota-bar.resting .qpip.done {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+.npc-cd-note {
+  font-size: 11.5px;
+  color: #92400e;
+  line-height: 1.3;
+}
+.npc-deploy-hint {
+  font-size: 11px;
+  color: #166534;
+  text-align: center;
+  line-height: 1.3;
 }
 
 .quiz-meta-row {
@@ -2213,4 +2267,208 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   .quiz-options-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
   .quiz-opt-btn { padding: 7px 8px; font-size: 12px; }
   .npc-approach-pill { bottom: calc(106px + var(--safe-b)); }
+}
+
+/* =========================================================================
+   50% OPACITY TRANSLUCENT GAME HUD CONTROLS, REWARD BOX BADGE & DEVICE FIT
+   ========================================================================= */
+.topbar-icon-btn.has-badge {
+  position: relative;
+}
+.topbar-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.4);
+}
+
+/* All in-game HUD control buttons cleanly translucent at 50% opacity so arena stays unobstructed */
+.hud-overlay .touch-joystick,
+.hud-overlay .touch-btn,
+.hud-overlay .touch-btn.sm,
+.hud-overlay .touch-btn.boost,
+.hud-overlay .hud-pause-btn,
+.hud-overlay .hud-board-toggle,
+.hud-overlay .desk-actions .btn,
+.hud-overlay .npc-approach-pill .btn,
+.hud-overlay .pw-charge-btn {
+  opacity: 0.50;
+  transition: opacity 0.14s ease, transform 0.1s ease;
+}
+.hud-overlay .touch-joystick:active,
+.hud-overlay .touch-btn:hover,
+.hud-overlay .touch-btn:active,
+.hud-overlay .touch-btn.active,
+.hud-overlay .touch-btn.buff-active,
+.hud-overlay .hud-pause-btn:hover,
+.hud-overlay .hud-pause-btn:active,
+.hud-overlay .hud-board-toggle:hover,
+.hud-overlay .desk-actions .btn:hover,
+.hud-overlay .desk-actions .btn:active,
+.hud-overlay .npc-approach-pill .btn:hover,
+.hud-overlay .npc-approach-pill .btn:active,
+.hud-overlay .pw-charge-btn:hover,
+.hud-overlay .pw-charge-btn:active {
+  opacity: 0.92 !important;
+}
+
+/* Touch Zoom & Map crisp text labels inside sm round buttons */
+.touch-btn.sm {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #064e3b;
+}
+
+/* In-game purchased Boost / Shield / Super charge pills */
+.hud-charge-bar {
+  position: fixed;
+  right: calc(12px + var(--safe-r));
+  top: calc(114px + var(--safe-t));
+  z-index: 38;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+.pw-charge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 2px solid #059669;
+  background: linear-gradient(180deg, #ffffff, #dcfce7);
+  box-shadow: 0 3px 0 #047857;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 900;
+  color: #064e3b;
+  cursor: pointer;
+}
+
+/* Tactical Map Safe Planning Banner */
+.map-pause-badge {
+  background: linear-gradient(180deg, #dcfce7, #bbf7d0);
+  border: 2px solid #16a34a;
+  color: #064e3b;
+  border-radius: 12px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+.tactical-canvas {
+  width: min(76vw, 290px);
+  height: min(76vw, 290px);
+  max-height: 44dvh;
+  max-width: 44dvh;
+  border-radius: 14px;
+  border: 2.5px solid #059669;
+  display: block;
+  margin: 0 auto;
+}
+
+/* 2x Watch Ad Double Reward highlight box */
+.ad-double-banner {
+  background: linear-gradient(180deg, #fffbeb, #fef3c7);
+  border: 2px solid #f59e0b;
+  border-radius: 14px;
+  padding: 7px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: center;
+}
+.ad-double-hint {
+  font-size: 11px;
+  font-weight: 800;
+  color: #92400e;
+  line-height: 1.25;
+}
+
+/* Device-screen responsive fit for Victory / Game Over / Pause / Respawn cards */
+.result-shell {
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: max(16px, var(--safe-t)) max(10px, var(--safe-r)) max(14px, var(--safe-b)) max(10px, var(--safe-l));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.result-card.modal-creative {
+  width: min(94vw, 430px);
+  gap: 7px !important;
+  padding: 22px 14px 12px !important;
+  margin: auto;
+}
+.result-card .modal-hero-art.compact {
+  gap: 8px;
+  margin: 0;
+}
+.result-card .result-kpis {
+  gap: 6px;
+}
+.result-card .result-kpis .kpi-card {
+  padding: 6px 8px;
+}
+.result-card .result-kpis .kpi-card strong {
+  font-size: 16px;
+}
+.result-card .loot-tasks-box {
+  gap: 5px;
+}
+.result-card .wallet-balance-bar {
+  gap: 6px;
+}
+.result-card .wb-pill {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.result-card .loot-items-row {
+  gap: 5px;
+}
+.result-card .loot-chip {
+  padding: 4px 5px;
+}
+.result-card .task-status-card {
+  padding: 6px 8px;
+  gap: 4px;
+}
+.result-card .result-circle-row {
+  margin-top: 2px;
+}
+@media (max-height: 700px) {
+  .result-card.modal-creative {
+    gap: 5px !important;
+    padding: 18px 11px 10px !important;
+  }
+  .result-card .result-kpis .kpi-card { padding: 4px 6px; }
+  .result-card .result-kpis .kpi-card strong { font-size: 14px; }
+  .result-card .task-status-card { display: none; }
+}
+@media (max-height: 520px) {
+  .result-card.modal-creative {
+    width: min(92vw, 560px);
+    padding: 14px 12px 10px !important;
+  }
+  .result-card .result-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .result-card .loot-items-row { display: none; }
+  .hud-charge-bar {
+    top: calc(98px + var(--safe-t));
+  }
 }
