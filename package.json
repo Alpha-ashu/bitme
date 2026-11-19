@@ -14,11 +14,11 @@
     "android:open": "npx cap open android"
   },
   "devDependencies": {
-    "concurrently": "^10.0.3",
-    "@capacitor/cli": "^6.1.2"
+    "concurrently": "^10.0.7",
+    "@capacitor/cli": "^8.6.2"
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
-    "@capacitor/android": "^6.1.2"
+    "@capacitor/android": "^8.6.2"
   }
 }
