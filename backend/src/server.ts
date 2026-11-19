@@ -2,6 +2,8 @@ import express from 'express';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
+import helmet from 'helmet';
+import multer from 'multer';
 import { AuthService } from './services/AuthService';
 import { EconomyService } from './services/EconomyService';
 import { MissionService } from './services/MissionService';
@@ -12,40 +14,57 @@ import { SocialService } from './services/SocialService';
 import { StatsService } from './services/StatsService';
 import { MilestoneService } from './services/MilestoneService';
 import { ExplorerService } from './services/ExplorerService';
+import { AnalyticsService, ReportPeriod } from './services/AnalyticsService';
+import { AdManagerService } from './services/AdManagerService';
+import { AdventureProgressionService } from './services/AdventureProgressionService';
+import { QuestEngineService } from './services/QuestEngineService';
+import { QuestionBankService } from './services/QuestionBankService';
+import { BossProgressionService } from './services/BossProgressionService';
+import { RewardBoxService } from './services/RewardBoxService';
 import { presence } from './services/Presence';
 import { sessionManager } from './services/GameSessionManager';
-import { getModeConfig } from './services/GameSessionService';
+import { getModeConfig, GameSessionService } from './services/GameSessionService';
 import { ProgressionService } from './services/ProgressionService';
 import { gameConfig, clientConfig, eventIsLive, activeSeasonId } from './config/GameConfig';
 import { antiCheat } from './services/AntiCheatService';
-import { GameMode, Evolution } from './types';
+import { GameMode, Evolution, UserStatus, AdPlacement } from './types';
 import { db } from './db/Database';
 
 const app = express();
 
-// CORS — locked to an allowlist when ALLOWED_ORIGINS is set (comma-separated),
-// otherwise open for local dev. Set it in production to your web/app origins.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
 const corsOrigin: any = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : '*';
 app.use(cors({ origin: corsOrigin }));
-app.use(express.json({ limit: '256kb' })); // cap body size — reject oversized payloads
+app.use(express.json({ limit: '512kb' }));
+
+// Serve validated uploaded ad creatives statically
+app.use('/uploads/ads', express.static(AdManagerService.getUploadDir(), {
+  maxAge: '7d',
+  fallthrough: true,
+}));
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, { cors: { origin: corsOrigin, methods: ['GET', 'POST'] } });
 
-// §sec Admin allowlist — comma-separated user ids in ADMIN_USER_IDS; the seeded demo
-// ranger is included so a fresh dev install still has an admin.
-const ADMIN_USER_IDS = new Set((process.env.ADMIN_USER_IDS || 'usr_ranger_alpha').split(',').map(s => s.trim()).filter(Boolean));
-
-// §sec Dependency-free in-memory rate limiter (per client IP + route bucket). Protects
-// auth (credential stuffing) and economy (reward farming) endpoints. Behind a proxy,
-// trust the first X-Forwarded-For hop. Buckets self-expire; a sweep prevents unbounded growth.
 const clientIp = (req: express.Request): string =>
   (req.headers['x-forwarded-for']?.toString().split(',')[0].trim()) || req.socket.remoteAddress || 'unknown';
 
 function rateLimit(bucket: string, windowMs: number, max: number) {
   const hits = new Map<string, { count: number; reset: number }>();
-  setInterval(() => { const now = Date.now(); for (const [k, v] of hits) if (v.reset < now) hits.delete(k); }, windowMs).unref?.();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
+  }, windowMs).unref?.();
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const key = bucket + ':' + clientIp(req);
     const now = Date.now();
@@ -61,17 +80,27 @@ function rateLimit(bucket: string, windowMs: number, max: number) {
   };
 }
 
-// Strict on auth (credential stuffing / guest-spam); looser on general economy writes.
-const authLimiter = rateLimit('auth', 60_000, 20);
-const writeLimiter = rateLimit('write', 60_000, 90);
+const authLimiter = rateLimit('auth', 60_000, 30);
+const writeLimiter = rateLimit('write', 60_000, 120);
 
-interface SocketUser { userId: string; username: string; mode: GameMode; skin: string; evolution: string; region?: string; lastSeq: number; worldVersion: number; viewRadius: number; }
+interface SocketUser {
+  userId: string;
+  username: string;
+  mode: GameMode;
+  roomId: string;
+  skin: string;
+  evolution: string;
+  region?: string;
+  lastSeq: number;
+  worldVersion: number;
+  viewRadius: number;
+  joinedAt: number;
+}
 const connectedSockets: Map<string, SocketUser> = new Map();
 
-const VALID_MODES: GameMode[] = ['classic', 'battle_royale', 'team', 'event'];
+const VALID_MODES: GameMode[] = ['classic', 'battle_royale', 'team', 'event', 'boss'];
 const asMode = (m: any): GameMode => (VALID_MODES.includes(m) ? m : 'classic');
 
-// §12 Respawn pricing — sourced from the central config (mirrors the RESPAWN OPTIONS panel).
 const RESPAWN_COST = gameConfig.economy.respawn;
 
 const auth = (req: express.Request, res: express.Response) => {
@@ -82,57 +111,143 @@ const auth = (req: express.Request, res: express.Response) => {
   return a;
 };
 
-// Admin-gated: valid token AND in the ADMIN_USER_IDS allowlist.
+// Strict RBAC guard: accepts ONLY verified sessions belonging to active admin/super_admin roles.
 const adminAuth = (req: express.Request, res: express.Response) => {
   const a = auth(req, res); if (!a) return null;
-  if (!ADMIN_USER_IDS.has(a.userId)) { res.status(403).json({ error: 'Forbidden — admin access required' }); return null; }
+  if (a.role !== 'admin' && a.role !== 'super_admin') {
+    res.status(403).json({ error: 'Forbidden — administrator role required' });
+    return null;
+  }
   return a;
 };
 
-// --------------------------------------------------------------- REST API
+const superAdminAuth = (req: express.Request, res: express.Response) => {
+  const a = auth(req, res); if (!a) return null;
+  if (a.role !== 'super_admin') {
+    res.status(403).json({ error: 'Forbidden — super_admin role required' });
+    return null;
+  }
+  return a;
+};
+
+const withRank = (profile: any) => profile ? {
+  ...profile,
+  rank: ProgressionService.getRank(profile.level, profile.prestige),
+  xpToNext: ProgressionService.xpToNext(profile.level),
+  nextEvolution: ProgressionService.nextEvolution(profile.level, profile.evolutionXp, profile.prestige),
+  derivedStats: profile.stats ? StatsService.derive(profile.stats) : undefined,
+} : profile;
+
+// Notify live player socket immediately on authoritative Kingdom Boss defeat
+sessionManager.setBossDefeatHandler((winnerUserId, bossId) => {
+  const res = ExplorerService.recordBossDefeat(winnerUserId, bossId);
+  for (const [sid, u] of connectedSockets) {
+    if (u.userId === winnerUserId) {
+      io.to(sid).emit('boss_defeated', {
+        ...res,
+        profile: res.profile ? withRank(res.profile) : undefined,
+      });
+    }
+  }
+});
+
+// --------------------------------------------------------------- Player Auth
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { username, email, password } = req.body || {};
   if (!username || !email || !password) return res.status(400).json({ error: 'Missing required registration fields' });
   if (typeof password !== 'string' || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  const result = await AuthService.register(String(username), String(email), password);
+  const result = await AuthService.register(String(username), String(email), password, {
+    ip: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
   if ('error' in result) return res.status(400).json(result);
-  res.json(result);
+  res.json({ ...result, profile: withRank(result.profile) });
 });
 
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing username or password' });
-  const result = await AuthService.login(String(username), String(password));
-  if ('error' in result) return res.status(400).json(result);
-  res.json(result);
+  const result = await AuthService.login(String(username), String(password), {
+    ip: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+  if ('error' in result) return res.status(401).json(result);
+  res.json({ ...result, profile: withRank(result.profile) });
 });
 
-app.post('/api/auth/guest', authLimiter, (req, res) => res.json(AuthService.createGuestAccount()));
+app.post('/api/auth/guest', authLimiter, (req, res) => {
+  const result = AuthService.createGuestAccount({ ip: clientIp(req), userAgent: req.headers['user-agent'] });
+  res.json({ ...result, profile: withRank(result.profile) });
+});
 
-// §5 Username availability + first-time onboarding.
-// §sec Rate-limited: this endpoint answers "does this account exist?", so leaving it open
-// lets anyone enumerate the whole user base one guess at a time.
 app.get('/api/auth/username-check', authLimiter, (req, res) => res.json(AuthService.checkUsername(String(req.query.name || ''))));
 
 app.post('/api/auth/onboard', authLimiter, (req, res) => {
   const { name, country, language } = req.body || {};
-  const result = AuthService.onboardGuest(name, country, language);
+  const result = AuthService.onboardGuest(name, country, language, {
+    ip: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
   if ('error' in result) return res.status(400).json(result);
   res.json({ ...result, profile: withRank(result.profile) });
 });
 
-const withRank = (profile: any) => profile ? { ...profile, rank: ProgressionService.getRank(profile.level, profile.prestige), xpToNext: ProgressionService.xpToNext(profile.level), nextEvolution: ProgressionService.nextEvolution(profile.level, profile.evolutionXp, profile.prestige), derivedStats: profile.stats ? StatsService.derive(profile.stats) : undefined } : profile;
+app.post('/api/auth/upgrade', writeLimiter, async (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const { username, email, password } = req.body || {};
+  if (!username || !email || !password) return res.status(400).json({ error: 'Username, email, and password are required' });
+  const result = await AuthService.upgradeGuest(a.userId, String(username), String(email), String(password), {
+    ip: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+  if ('error' in result) return res.status(400).json(result);
+  res.json({ ...result, profile: withRank(result.profile) });
+});
 
+app.post('/api/auth/logout', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  AuthService.logout(a.sessionId, a.userId);
+  res.json({ success: true });
+});
+
+// --------------------------------------------------------------- Admin Auth (Isolated)
+app.post('/api/admin/auth/login', authLimiter, async (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
+  const result = await AuthService.loginAdmin(String(username), String(password), {
+    ip: clientIp(req),
+    userAgent: req.headers['user-agent'],
+  });
+  if ('error' in result) return res.status(401).json(result);
+  res.json(result);
+});
+
+app.post('/api/admin/auth/logout', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  AuthService.logout(a.sessionId);
+  res.json({ success: true });
+});
+
+app.get('/api/admin/auth/me', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const u = db.getUserById(a.userId);
+  res.json({ admin: { id: a.userId, username: a.username, email: u?.email || '', role: a.role } });
+});
+
+// --------------------------------------------------------------- Player Profile & Progression
 app.get('/api/player/profile', (req, res) => {
   const a = auth(req, res); if (!a) return;
-  const isAdmin = ADMIN_USER_IDS.has(a.userId);
   const rawProfile = db.getProfile(a.userId);
-  res.json({ user: { id: a.userId, username: a.username, isGuest: a.isGuest, isAdmin }, profile: withRank(rawProfile ? { ...rawProfile, isAdmin } : rawProfile) });
+  const isAdmin = a.role === 'admin' || a.role === 'super_admin';
+  res.json({
+    user: { id: a.userId, username: a.username, isGuest: a.isGuest, role: a.role, isAdmin },
+    profile: withRank(rawProfile),
+  });
 });
 
 app.post('/api/player/evolution', (req, res) => {
   const a = auth(req, res); if (!a) return;
-  const result = db.equipEvolution(a.userId, req.body.evolution as Evolution);
+  const result = db.equipEvolution(a.userId, req.body?.evolution as Evolution);
   res.json({ ...result, profile: withRank(result.profile) });
 });
 
@@ -147,12 +262,48 @@ app.get('/api/player/coupons', (req, res) => {
   res.json({ coupons: db.getProfile(a.userId)?.coupons || [] });
 });
 
-app.get('/api/modes', (_req, res) => {
-  res.json({ modes: VALID_MODES.map(getModeConfig) });
+const NAME_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+app.post('/api/player/edit-profile', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const profile = db.getProfile(a.userId);
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+  const { displayName, avatar, title, country, region } = req.body || {};
+  const updates: any = {};
+  if (avatar !== undefined) updates.avatar = String(avatar).slice(0, 12);
+  if (title !== undefined) updates.title = String(title).slice(0, 40);
+  if (country !== undefined) updates.country = String(country).slice(0, 40);
+  if (region !== undefined) updates.preferredRegion = String(region).slice(0, 40);
+
+  if (displayName !== undefined && displayName !== profile.displayName) {
+    const v = AuthService.validateUsername(String(displayName));
+    if (!v.ok) return res.status(400).json({ error: v.reason });
+    const last = profile.lastNameChange || 0;
+    const remaining = NAME_COOLDOWN_MS - (Date.now() - last);
+    if (last && remaining > 0) return res.status(400).json({ error: `You can change your display name again in ${Math.ceil(remaining / 86400000)} day(s)` });
+    updates.displayName = String(displayName).trim();
+    updates.lastNameChange = Date.now();
+  }
+
+  const updated = db.updateProfile(a.userId, updates);
+  res.json({ success: true, profile: withRank(updated) });
 });
 
-// §12 Public gameplay config — lets the client mirror server balancing (XP curve,
-// evolution ladder, reward formula, world tunables) so offline play stays consistent.
+app.post('/api/player/equip', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const { skin } = req.body || {};
+  if (!skin || typeof skin !== 'string') return res.status(400).json({ error: 'skin is required' });
+  const result = EconomyService.equipSkin(a.userId, skin);
+  res.status(result.success ? 200 : 403).json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
+});
+
+app.post('/api/player/equip-accessory', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const result = EconomyService.equipAccessory(a.userId, String(req.body?.accessoryId || ''));
+  res.status(result.success ? 200 : 403).json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
+});
+
+// --------------------------------------------------------------- Config, Modes, Events, Lobbies
+app.get('/api/modes', (_req, res) => res.json({ modes: VALID_MODES.map(getModeConfig) }));
 app.get('/api/config', (_req, res) => res.json(clientConfig()));
 
 app.get('/api/world/events', (_req, res) => {
@@ -160,9 +311,6 @@ app.get('/api/world/events', (_req, res) => {
   res.json({ events });
 });
 
-// Live-ops events feed for the Events screen: in-match world events currently running in a
-// simulation, plus the scheduled calendar from config. Both are pure content — no user data —
-// so a new event is a config edit, never a client release.
 app.get('/api/events', (_req, res) => {
   const now = new Date();
   const live = sessionManager.getActiveSessions()
@@ -183,15 +331,120 @@ app.get('/api/events', (_req, res) => {
   res.json({ live, scheduled, season: activeSeasonId(now), serverTime: now.toISOString() });
 });
 
-// Cosmetics catalog. With a valid token it is annotated with THIS player's ownership,
-// affordability and level gates; anonymously it is just the price list.
+app.get('/api/lobbies', (req, res) => {
+  const mode = req.query.mode ? asMode(req.query.mode) : undefined;
+  res.json({ rooms: sessionManager.listRooms(mode) });
+});
+
+app.post('/api/lobbies/create', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const mode = asMode(req.body?.mode || 'battle_royale');
+  const maxPlayers = Math.min(24, Math.max(2, Number(req.body?.maxPlayers) || 24));
+  const room = sessionManager.createCustomRoom({
+    mode,
+    hostUserId: a.userId,
+    hostName: a.username,
+    maxPlayers,
+    region: String(req.body?.region || 'Global'),
+    isPrivate: Boolean(req.body?.isPrivate),
+    kingdom: Number(req.body?.kingdom) || 1,
+    withBots: Boolean(req.body?.withBots),
+    mapTheme: req.body?.mapTheme ? String(req.body.mapTheme) : undefined,
+    durationSeconds: req.body?.durationSeconds ? Number(req.body.durationSeconds) : undefined,
+    stageInLobby: Boolean(req.body?.stageInLobby),
+  });
+  res.json({ success: true, room });
+});
+
+app.post('/api/lobbies/join-code', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const code = String(req.body?.code || '').trim().toUpperCase();
+  const room = sessionManager.getRoomByCode(code);
+  if (!room) return res.status(404).json({ error: 'Room code not found' });
+  const joined = sessionManager.authorizeAndJoinLobby(room.roomId, a.userId, a.username, code);
+  if (!joined.ok) return res.status(403).json({ error: joined.error });
+  res.json({ success: true, room: joined.room });
+});
+
+app.get('/api/lobbies/:roomId', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const room = sessionManager.getRoomInfoById(String(req.params.roomId || ''));
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  const check = sessionManager.authorizeSocketJoin(room.roomId, a.userId, String(req.query.code || ''));
+  if (!check.ok) return res.status(403).json({ error: check.error });
+  res.json({ room });
+});
+
+app.post('/api/lobbies/:roomId/join', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = sessionManager.authorizeAndJoinLobby(String(req.params.roomId || ''), a.userId, a.username, req.body?.code);
+  res.status(r.ok ? 200 : 403).json(r);
+});
+
+app.post('/api/lobbies/:roomId/ready', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = sessionManager.setMemberReady(String(req.params.roomId || ''), a.userId, Boolean(req.body?.ready));
+  res.status(r.ok ? 200 : 400).json(r);
+});
+
+app.patch('/api/lobbies/:roomId/settings', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = sessionManager.updateRoomSettings(String(req.params.roomId || ''), a.userId, req.body || {});
+  res.status(r.ok ? 200 : 403).json(r);
+});
+
+app.post('/api/lobbies/:roomId/invite', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const targetUserId = String(req.body?.targetUserId || '');
+  if (!targetUserId) return res.status(400).json({ error: 'targetUserId required' });
+  const r = sessionManager.inviteUserToRoom(String(req.params.roomId || ''), a.userId, targetUserId);
+  if (!r.ok || !r.room) return res.status(403).json(r);
+  SocialService.invite(a.userId, targetUserId, r.room.mode, r.room.roomId);
+  deliverInvites(targetUserId);
+  res.json({ ok: true, room: r.room });
+});
+
+app.post('/api/lobbies/:roomId/start', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = sessionManager.startCustomMatch(String(req.params.roomId || ''), a.userId);
+  if (!r.ok || !r.room) return res.status(403).json(r);
+  io.to(r.room.roomId).emit('room_match_started', { room: r.room });
+  res.json({ ok: true, room: r.room });
+});
+
+// --------------------------------------------------------------- Shop & Inventory & Rewards
 app.get('/api/shop/catalog', (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
   const a = token ? AuthService.verifyToken(token) : null;
-  res.json(EconomyService.getCatalog(a?.userId));
+  res.json({
+    ...EconomyService.getCatalog(a?.userId),
+    ...EconomyService.getAccessoryCatalog(a?.userId),
+  });
 });
 
-// §15 Rewards marketplace — region-aware catalog + Star redemption for digital rewards.
+app.post('/api/shop/purchase', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const skinId = req.body?.skinId ?? req.body?.itemId;
+  if (!skinId || typeof skinId !== 'string') return res.status(400).json({ error: 'skinId is required' });
+  const result = EconomyService.purchaseSkin(a.userId, skinId);
+  res.status(result.success ? 200 : 400).json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
+});
+
+app.post('/api/shop/purchase-accessory', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const accessoryId = req.body?.accessoryId;
+  if (!accessoryId || typeof accessoryId !== 'string') return res.status(400).json({ error: 'accessoryId is required' });
+  const result = EconomyService.purchaseAccessory(a.userId, accessoryId);
+  res.status(result.success ? 200 : 400).json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
+});
+
+app.post('/api/inventory/open', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const itemId = String(req.body?.itemId || '');
+  const result = EconomyService.openInventoryItem(a.userId, itemId);
+  res.status(result.success ? 200 : 400).json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
+});
+
 app.get('/api/rewards/catalog', (req, res) => {
   const region = (req.query.region as string) || 'Global';
   res.json(RewardsService.getCatalog(region));
@@ -205,63 +458,7 @@ app.post('/api/rewards/redeem', writeLimiter, (req, res) => {
   res.json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
 });
 
-// Buy a skin. The price and every gate are resolved server-side from the config — the body
-// carries only which skin, never what it costs.
-app.post('/api/shop/purchase', writeLimiter, (req, res) => {
-  const a = auth(req, res); if (!a) return;
-  const skinId = req.body?.skinId ?? req.body?.itemId;
-  if (!skinId || typeof skinId !== 'string') return res.status(400).json({ error: 'skinId is required' });
-  const result = EconomyService.purchaseSkin(a.userId, skinId);
-  res.status(result.success ? 200 : 400).json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
-});
-
-// §sec Equipping is gated on ownership. Previously this wrote `equippedSkin` unchecked, so
-// any client could equip a legendary skin it had never bought.
-app.post('/api/player/equip', (req, res) => {
-  const a = auth(req, res); if (!a) return;
-  const { skin } = req.body || {};
-  if (!skin || typeof skin !== 'string') return res.status(400).json({ error: 'skin is required' });
-  const result = EconomyService.equipSkin(a.userId, skin);
-  res.status(result.success ? 200 : 403).json({ ...result, profile: result.profile ? withRank(result.profile) : undefined });
-});
-
-// §6 Edit profile — avatar/title/country/region freely; display name with a cooldown + rules.
-const NAME_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-app.post('/api/player/edit-profile', (req, res) => {
-  const a = auth(req, res); if (!a) return;
-  const profile = db.getProfile(a.userId);
-  if (!profile) return res.status(404).json({ error: 'Profile not found' });
-  const { displayName, avatar, title, country, region } = req.body || {};
-  const updates: any = {};
-  if (avatar !== undefined) updates.avatar = avatar;
-  if (title !== undefined) updates.title = title;
-  if (country !== undefined) updates.country = country;
-  if (region !== undefined) updates.preferredRegion = region;
-
-  if (displayName !== undefined && displayName !== profile.displayName) {
-    const v = AuthService.validateUsername(String(displayName)); // reuse name rules (anti-impersonation)
-    if (!v.ok) return res.status(400).json({ error: v.reason });
-    const last = (profile as any).lastNameChange || 0;
-    const remaining = NAME_COOLDOWN_MS - (Date.now() - last);
-    if (last && remaining > 0) return res.status(400).json({ error: `You can change your display name again in ${Math.ceil(remaining / 86400000)} day(s)` });
-    updates.displayName = String(displayName).trim();
-    updates.lastNameChange = Date.now();
-  }
-
-  const updated = db.updateProfile(a.userId, updates);
-  res.json({ success: true, profile: withRank(updated) });
-});
-
-app.post('/api/player/equip-accessory', (req, res) => {
-  const a = auth(req, res); if (!a) return;
-  const { accessoryId } = req.body;
-  const profile = db.getProfile(a.userId);
-  if (!profile) return res.status(404).json({ error: 'Profile not found' });
-  // null/undefined means unequip; otherwise set the accessory
-  const updated = db.updateProfile(a.userId, { equippedAccessory: accessoryId || undefined });
-  res.json({ success: true, profile: withRank(updated) });
-});
-
+// --------------------------------------------------------------- Missions, Milestones, Progress
 app.get('/api/missions', (req, res) => {
   const a = auth(req, res); if (!a) return;
   res.json({ missions: MissionService.getUserMissions(a.userId) });
@@ -269,8 +466,7 @@ app.get('/api/missions', (req, res) => {
 
 app.post('/api/missions/claim', (req, res) => {
   const a = auth(req, res); if (!a) return;
-  const result = MissionService.claimReward(a.userId, req.body.missionId);
-  // §7 Claiming a mission may cross a coupon eligibility threshold — auto-grant if so.
+  const result = MissionService.claimReward(a.userId, req.body?.missionId);
   if (result.success) {
     const profile = db.getProfile(a.userId);
     const grantedCoupons = CouponService.autoGrantEligible(a.userId, profile?.preferredRegion || 'Global');
@@ -279,8 +475,6 @@ app.post('/api/missions/claim', (req, res) => {
   res.json(result);
 });
 
-// §V7 Auto-claim every completed-but-unclaimed mission (idempotent via the isClaimed gate,
-// so rewards can never be granted twice). Called after a match so completions pay out.
 app.post('/api/missions/claim-all', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   let stars = 0, xp = 0, evoXp = 0; const claimed: string[] = [];
@@ -294,8 +488,6 @@ app.post('/api/missions/claim-all', writeLimiter, (req, res) => {
   res.json({ success: true, claimed, stars, xp, evoXp, missions: db.getMissions(a.userId), profile: withRank(profile) });
 });
 
-// §V7 §9 Grant the all-daily-missions-complete bonus. Server validates completion AND that
-// it hasn't been claimed today, so the Rare Egg + stars can be granted at most once per day.
 app.post('/api/missions/daily-bonus', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const profile = db.getProfile(a.userId);
@@ -312,16 +504,11 @@ app.post('/api/missions/daily-bonus', writeLimiter, (req, res) => {
   res.json({ success: true, rewards: { stars: b.stars, xp: b.xp, evoXp: b.evoXp, item: b.itemName, itemIcon: b.itemIcon }, profile: withRank(updated) });
 });
 
-// §milestone The journey timeline for a mode, annotated with this player's progress.
 app.get('/api/milestones', (req, res) => {
   const a = auth(req, res); if (!a) return;
-  const mode = String(req.query.mode || 'explorer');
-  res.json(MilestoneService.overview(a.userId, mode));
+  res.json(MilestoneService.overview(a.userId, String(req.query.mode || 'explorer')));
 });
 
-// §milestone Bank a story checkpoint mid-match. The body says only WHICH milestone; whether
-// it was actually earned is decided from the server's own observation of the live run, so a
-// client can't checkpoint its way to rewards it never played for.
 app.post('/api/match/checkpoint', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const id = String(req.body?.milestoneId || '');
@@ -330,12 +517,9 @@ app.post('/api/match/checkpoint', writeLimiter, (req, res) => {
   res.status(r.success || r.alreadyClaimed ? 200 : 400).json({ ...r, profile: r.profile ? withRank(r.profile) : undefined });
 });
 
-// §milestone Safety net at match end: bank anything whose target is met but that wasn't
-// checkpointed live (a beat reached in the last seconds, or while briefly offline).
 app.post('/api/match/checkpoint-all', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
-  const mode = String(req.body?.mode || 'explorer');
-  const claimed = MilestoneService.claimAllReached(a.userId, mode);
+  const claimed = MilestoneService.claimAllReached(a.userId, String(req.body?.mode || 'explorer'));
   res.json({
     success: true,
     claimed: claimed.map(c => ({ id: c.milestone!.id, title: c.milestone!.title, icon: c.milestone!.icon, rewards: c.rewards })),
@@ -343,10 +527,6 @@ app.post('/api/match/checkpoint-all', writeLimiter, (req, res) => {
   });
 });
 
-// §13 Offline progress sync. A client that played without a connection queues its gameplay
-// increments and hands them over here. Clamped hard per metric per batch: an offline session
-// is bounded by how much a human can physically collect, so anything beyond that is either a
-// bug or a forgery and is trimmed rather than trusted.
 const PROGRESS_SYNC_CAPS: Record<string, number> = {
   cherry: 2000, apple: 2000, frog: 1000, star: 1000, egg: 200, mushroom: 500,
   shield: 500, speed: 500, powerup: 1000, magnet: 500, fire: 500, gift: 200,
@@ -360,7 +540,7 @@ app.post('/api/progress/sync', writeLimiter, (req, res) => {
   const applied: Record<string, number> = {};
   for (const [metric, raw] of Object.entries(progress)) {
     const cap = PROGRESS_SYNC_CAPS[metric];
-    if (!cap) continue; // unknown metric — ignore rather than let a client invent one
+    if (!cap) continue;
     const n = Math.floor(Number(raw));
     if (!Number.isFinite(n) || n <= 0) continue;
     const amount = Math.min(n, cap);
@@ -376,14 +556,18 @@ app.post('/api/progress/sync', writeLimiter, (req, res) => {
   });
 });
 
-// --------------------------------------------------------------- §explorer campaign
-// Current kingdom, its NPCs and what each is saying right now, quest progress, and the
-// kingdom map. One call powers both the Explorer screen and the in-world HUD tracker.
+// --------------------------------------------------------------- Story / Explorer Campaign
 app.get('/api/explorer/state', (req, res) => {
   const a = auth(req, res); if (!a) return;
   const ov = ExplorerService.overview(a.userId);
   if (!ov) return res.status(404).json({ error: 'Profile not found' });
   res.json(ov);
+});
+
+app.post('/api/explorer/kingdom/select', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = ExplorerService.selectKingdom(a.userId, Number(req.body?.kingdom));
+  res.status(r.success ? 200 : 400).json(r);
 });
 
 app.post('/api/explorer/quest/accept', writeLimiter, (req, res) => {
@@ -392,7 +576,6 @@ app.post('/api/explorer/quest/accept', writeLimiter, (req, res) => {
   res.status(r.success ? 200 : 400).json({ ...r, state: ExplorerService.overview(a.userId) });
 });
 
-// Whether the quest is actually finished is decided here, from counters the server credited.
 app.post('/api/explorer/quest/claim', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const r: any = ExplorerService.claimQuest(a.userId, String(req.body?.questId || ''));
@@ -403,75 +586,366 @@ app.post('/api/explorer/quest/claim', writeLimiter, (req, res) => {
   });
 });
 
+app.post('/api/explorer/boss/defeat', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r: any = ExplorerService.recordBossDefeat(a.userId, String(req.body?.bossId || ''));
+  res.status(r.success ? 200 : 400).json({
+    ...r,
+    profile: r.profile ? withRank(r.profile) : undefined,
+  });
+});
+
+// --------------------------------------------------------------- 1,000-Level Adventure Campaign, Quest Engine & Quiz API
+app.get('/api/adventure/overview', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const world = req.query.world ? Number(req.query.world) : undefined;
+  const page = req.query.page !== undefined ? Number(req.query.page) : undefined;
+  const pageSize = req.query.pageSize ? Number(req.query.pageSize) : 20;
+  const overview = AdventureProgressionService.getOverview(a.userId, { world, page, pageSize });
+  const activeQuest = QuestEngineService.getActiveMainQuest(a.userId);
+  const clearedBosses = BossProgressionService.listClearedBosses(a.userId);
+  const npcQuotas = QuestEngineService.getAllNpcQuotas(a.userId);
+  const rewardBox = RewardBoxService.listBox(a.userId);
+  res.json({ ...overview, activeQuest, clearedBosses, npcQuotas, rewardBox });
+});
+
+app.get('/api/adventure/npc-quotas', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  res.json({ ok: true, quotas: QuestEngineService.getAllNpcQuotas(a.userId) });
+});
+
+// --------------------------------------------------------------- Reward Box & Power-Up Supply Store
+app.get('/api/reward-box', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  res.json({ ok: true, ...RewardBoxService.listBox(a.userId) });
+});
+
+app.post('/api/reward-box/collect', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const itemId = String(req.body?.itemId || '');
+  if (!itemId) return res.status(400).json({ ok: false, error: 'itemId required' });
+  const r = RewardBoxService.collectItem(a.userId, itemId);
+  res.status(r.ok ? 200 : 400).json({
+    ...r,
+    profile: r.profile ? withRank(r.profile) : undefined,
+    rewardBox: RewardBoxService.listBox(a.userId),
+  });
+});
+
+app.post('/api/reward-box/collect-all', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = RewardBoxService.collectAll(a.userId);
+  res.json({
+    ...r,
+    profile: r.profile ? withRank(r.profile) : undefined,
+    rewardBox: RewardBoxService.listBox(a.userId),
+  });
+});
+
+app.post('/api/shop/purchase-powerup', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const powerupId = String(req.body?.powerupId || '');
+  const r = RewardBoxService.purchasePowerup(a.userId, powerupId);
+  res.status(r.ok ? 200 : 400).json({
+    ...r,
+    profile: r.profile ? withRank(r.profile) : undefined,
+    rewardBox: RewardBoxService.listBox(a.userId),
+  });
+});
+
+app.post('/api/player/use-powerup', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const powerupId = String(req.body?.powerupId || '') as 'pw_boost' | 'pw_shield' | 'pw_super';
+  const liveSession = sessionManager.findPlayerSession(a.userId);
+  const consumed = RewardBoxService.consumePowerup(a.userId, powerupId);
+  if (!consumed.ok) return res.status(400).json(consumed);
+  if (liveSession) liveSession.applyPurchasedPowerup(a.userId, powerupId);
+  res.json({
+    ...consumed,
+    appliedInMatch: !!liveSession,
+    profile: consumed.profile ? withRank(consumed.profile) : undefined,
+  });
+});
+
+app.get('/api/adventure/level/:levelNumber', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const lvl = Math.max(1, Math.min(1000, Math.floor(Number(req.params.levelNumber) || 1)));
+  const def = AdventureProgressionService.getLevelDef(lvl);
+  const prog = AdventureProgressionService.getProgress(a.userId);
+  res.json({
+    level: def,
+    unlocked: lvl <= prog.highestUnlockedLevel,
+    completed: prog.completedLevels.includes(lvl),
+    bossProgress: def.isBossCheckpoint ? BossProgressionService.getBossProgress(a.userId, lvl) : undefined,
+  });
+});
+
+app.post('/api/adventure/npc/interact', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const npcId = String(req.body?.npcId || '');
+  if (!npcId) return res.status(400).json({ ok: false, error: 'npcId required' });
+  const liveSession = sessionManager.findPlayerSession(a.userId);
+  if (liveSession) {
+    const check = liveSession.validateManualNpcInteract(a.userId, npcId);
+    if (!check.ok) return res.status(400).json(check);
+    return res.json({ ok: true, encounter: check.encounter });
+  }
+  // Offline / menu fallback still validates NPC & quest eligibility on the server
+  const encounter = QuestEngineService.recordOffer(a.userId, npcId);
+  if (!encounter) return res.status(404).json({ ok: false, error: 'No available quest from this NPC' });
+  res.json({ ok: true, encounter });
+});
+
+app.post('/api/adventure/quest/accept', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = QuestEngineService.acceptQuest(a.userId, {
+    questId: req.body?.questId ? String(req.body.questId) : undefined,
+    levelNumber: req.body?.levelNumber ? Number(req.body.levelNumber) : undefined,
+    npcId: req.body?.npcId ? String(req.body.npcId) : undefined,
+  });
+  const liveSession = sessionManager.findPlayerSession(a.userId);
+  let deployedTo: { ok: boolean; x?: number; y?: number; minEnemyDistance?: number } | undefined;
+  if (liveSession && r.ok) {
+    if (r.quizQuestion) {
+      // Keep snake safely frozen if quiz immediately opened
+      liveSession.setPlayerInteraction(a.userId, true);
+    } else {
+      // Deploy player into a fresh, enemy-free quest area with 4.5s spawn shield so no snake immediately ambushes them!
+      const stg = r.session?.currentStage;
+      const hint = stg?.waypoints?.[0] || stg?.switches?.[0] || null;
+      deployedTo = liveSession.deployPlayerToSafeQuestArea(a.userId, hint ? { x: hint.x, y: hint.y } : null);
+    }
+  }
+  const status = r.ok ? 200 : (r.cooldownRemainingSec ? 429 : 400);
+  res.status(status).json({
+    ...r,
+    deployedTo,
+    overview: AdventureProgressionService.getOverview(a.userId),
+    npcQuotas: QuestEngineService.getAllNpcQuotas(a.userId),
+  });
+});
+
+app.post('/api/adventure/quest/later', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = QuestEngineService.deferQuest(a.userId, String(req.body?.npcId || ''), String(req.body?.questId || ''));
+  sessionManager.findPlayerSession(a.userId)?.setPlayerInteraction(a.userId, false);
+  res.json(r);
+});
+
+app.post('/api/adventure/quest/skip', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = QuestEngineService.skipQuest(
+    a.userId,
+    String(req.body?.npcId || ''),
+    String(req.body?.questId || ''),
+    Number(req.body?.levelNumber) || 0
+  );
+  sessionManager.findPlayerSession(a.userId)?.setPlayerInteraction(a.userId, false);
+  res.json(r);
+});
+
+app.post('/api/adventure/quest/abandon', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = QuestEngineService.abandonActiveQuest(a.userId);
+  sessionManager.findPlayerSession(a.userId)?.setPlayerInteraction(a.userId, false);
+  res.status(r.ok ? 200 : 400).json(r);
+});
+
+app.post('/api/adventure/quest/claim', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const r = QuestEngineService.claimQuest(a.userId, req.body?.sessionId ? String(req.body.sessionId) : undefined);
+  sessionManager.findPlayerSession(a.userId)?.setPlayerInteraction(a.userId, false);
+  res.status(r.ok || r.alreadyClaimed ? 200 : 400).json({
+    ...r,
+    profile: r.profile ? withRank(r.profile) : undefined,
+    overview: AdventureProgressionService.getOverview(a.userId),
+  });
+});
+
+app.get('/api/adventure/quiz/:quizSessionId', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const data = QuestionBankService.getSession(a.userId, String(req.params.quizSessionId || ''));
+  if (!data) return res.status(404).json({ ok: false, error: 'Quiz session not found' });
+  res.json({ ok: true, session: { id: data.session.id, status: data.session.status, correctCount: data.session.correctCount, wrongCount: data.session.wrongCount, passThreshold: data.session.passThreshold }, currentQuestion: data.currentQuestion });
+});
+
+app.post('/api/adventure/quiz/answer', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const quizSessionId = String(req.body?.quizSessionId || '');
+  const questionId = String(req.body?.questionId || '');
+  const answer = String(req.body?.answer ?? '');
+  const responseMs = Number(req.body?.responseMs) || 0;
+  const result = QuestionBankService.submitAnswer(a.userId, quizSessionId, questionId, answer, responseMs);
+  if (!result.ok) return res.status(400).json(result);
+
+  let questUpdate: any = null;
+  if (result.completed && result.questSessionId) {
+    questUpdate = QuestEngineService.handleQuizOutcome(
+      a.userId,
+      result.questSessionId,
+      !!result.passed,
+      result.correctCount || 0
+    );
+    const liveSession = sessionManager.findPlayerSession(a.userId);
+    if (liveSession) {
+      liveSession.setPlayerInteraction(a.userId, !!questUpdate?.nextQuiz);
+    }
+  }
+  res.json({ ...result, questUpdate });
+});
+
 app.get('/api/achievements', (req, res) => {
   const a = auth(req, res); if (!a) return;
   res.json({ achievements: db.getAchievements(a.userId) });
 });
 
-// §V7 Leaderboards. No `category` → legacy global score board (back-compat). With a
-// category → the redesigned typed board. `scope=friends` (auth) or `scope=local` filters.
+// --------------------------------------------------------------- Leaderboards
 const LEADERBOARD_CATEGORIES = ['level', 'score', 'kills', 'wins', 'survival', 'stars', 'explorer'];
-
-// §sec A leaderboard is a public-facing view of OTHER people's accounts, so it publishes the
-// bare minimum: rank, display name, avatar, level and the one metric being ranked. The raw
-// `userId` is stripped — it was letting any caller harvest every account identifier in the
-// database — and replaced with an `isYou` flag, which is all the UI ever needed it for.
 const publicBoard = (entries: Array<{ rank: number; userId: string; displayName: string; avatar: string; level: number; value: number }>, viewerId?: string) =>
   entries.map(({ userId, ...e }) => ({ ...e, isYou: !!viewerId && userId === viewerId }));
 
 app.get('/api/leaderboard', (req, res) => {
-  const a = auth(req, res); if (!a) return; // §sec authenticated players only — no anonymous scraping
-  const category = String(req.query.category || '');
-  if (!category) {
-    // Legacy global board — same treatment: no account ids on the wire.
-    const legacy = db.getLeaderboard().map(({ userId, ...e }) => ({ ...e, isYou: userId === a.userId }));
-    return res.json({ leaderboard: legacy });
-  }
+  const category = req.query.category as string | undefined;
+  if (!category) return res.json({ leaderboard: db.getLeaderboard().map(({ userId: _u, ...r }) => r) });
 
-  if (!LEADERBOARD_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Unknown category' });
-  const scope = String(req.query.scope || 'global');
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  const a = token ? AuthService.verifyToken(token) : null;
+  const scope = (req.query.scope as string) || 'global';
   if (scope === 'friends') {
+    if (!a) return res.status(401).json({ error: 'Unauthorized' });
     const ids = [a.userId, ...db.getSocial(a.userId).friends];
     return res.json({ category, scope, entries: publicBoard(db.getCategoryLeaderboard(category, 100, { userIds: ids }), a.userId) });
   }
   if (scope === 'local') {
     const region = String(req.query.region || 'Global');
-    return res.json({ category, scope, region, entries: publicBoard(db.getCategoryLeaderboard(category, 100, { region }), a.userId) });
+    return res.json({ category, scope, region, entries: publicBoard(db.getCategoryLeaderboard(category, 100, { region }), a?.userId) });
   }
-  res.json({ category, scope: 'global', entries: publicBoard(db.getCategoryLeaderboard(category, 100), a.userId) });
+  res.json({ category, scope: 'global', entries: publicBoard(db.getCategoryLeaderboard(category, 100), a?.userId) });
 });
 
 app.get('/api/leaderboard/categories', (_req, res) => res.json({ categories: LEADERBOARD_CATEGORIES }));
+
+// --------------------------------------------------------------- Player Advertisements & Rewarded Opt-In
+app.get('/api/ads/serve', (req, res) => {
+  const placement = String(req.query.placement || 'home_screen') as AdPlacement;
+  if (!AdManagerService.isValidPlacement(placement)) {
+    return res.status(400).json({ error: 'Invalid ad placement' });
+  }
+  const ads = AdManagerService.serveForPlacement(placement);
+  res.json({ placement, ad: ads[0] || null, ads });
+});
+
+app.post('/api/ads/track', writeLimiter, (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  const a = token ? AuthService.verifyToken(token) : null;
+  const { adId, placement, eventType } = req.body || {};
+  if (!adId || (eventType !== 'impression' && eventType !== 'click')) {
+    return res.status(400).json({ error: 'adId and valid eventType (impression|click) required' });
+  }
+  const ok = AdManagerService.trackEvent(String(adId), String(placement || 'home_screen'), eventType, a?.userId);
+  if (!ok) return res.status(404).json({ error: 'Advertisement not found' });
+  res.json({ success: true });
+});
+
+app.post('/api/ads/reward-start', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const adId = req.body?.adId ? String(req.body.adId) : undefined;
+  const issued = AdManagerService.issueRewardToken(a.userId, adId);
+  res.json({ success: true, ...issued });
+});
+
+// Server-side record of last match rewards so Watch Ad can legitimately DOUBLE (2×) run rewards once per match
+const lastMatchRewards = new Map<string, { stars: number; xp: number; doubled: boolean; at: number }>();
 
 app.post('/api/ads/claim', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const profile = db.getProfile(a.userId);
   if (!profile) return res.status(404).json({ error: 'Profile not found' });
-  const { stars: bonusStars, tickets: bonusTickets, cooldownMs } = gameConfig.economy.ad;
+
+  const adToken = String(req.body?.adToken || '');
+  const verified = AdManagerService.consumeRewardToken(a.userId, adToken);
+  if (!verified.ok) return res.status(400).json({ error: verified.error });
+
+  const { stars: defaultBonusStars, tickets: bonusTickets, cooldownMs } = gameConfig.economy.ad;
+  const doubleMatch = Boolean(req.body?.doubleMatch);
   const last = profile.lastAdClaim || 0;
   const remaining = cooldownMs - (Date.now() - last);
-  if (remaining > 0) return res.status(429).json({ error: `Please wait ${Math.ceil(remaining / 1000)}s before claiming another ad reward` });
+  if (!doubleMatch && remaining > 0) {
+    return res.status(429).json({ error: `Please wait ${Math.ceil(remaining / 1000)}s before claiming another ad reward` });
+  }
+
+  let bonusStars = defaultBonusStars;
+  let bonusXp = 0;
+  const prevMatch = lastMatchRewards.get(a.userId);
+  if (doubleMatch && prevMatch && !prevMatch.doubled) {
+    prevMatch.doubled = true;
+    bonusStars = Math.min(2500, Math.max(defaultBonusStars, prevMatch.stars));
+    bonusXp = Math.min(2500, Math.max(0, prevMatch.xp));
+  } else if (doubleMatch && prevMatch?.doubled) {
+    return res.status(400).json({ error: 'Match reward was already doubled' });
+  }
+
+  if (bonusXp > 0) {
+    db.grantRewards(a.userId, { stars: bonusStars, xp: bonusXp, evoXp: 0 });
+    const afterXp = db.getProfile(a.userId)!;
+    const updated = db.updateProfile(a.userId, { tickets: afterXp.tickets + bonusTickets, lastAdClaim: Date.now() });
+    return res.json({
+      success: true,
+      doubled: true,
+      message: `2× Reward Doubled! +${bonusStars} Stars, +${bonusXp} XP & +${bonusTickets} Tickets.`,
+      bonusStars,
+      bonusXp,
+      bonusTickets,
+      profile: withRank(updated),
+    });
+  }
+
   const updated = db.updateProfile(a.userId, { stars: profile.stars + bonusStars, tickets: profile.tickets + bonusTickets, lastAdClaim: Date.now() });
-  res.json({ success: true, message: `Claimed Double Reward! +${bonusStars} Stars & +${bonusTickets} Tickets.`, bonusStars, bonusTickets, profile: withRank(updated) });
+  res.json({
+    success: true,
+    doubled: doubleMatch,
+    message: `2× Reward Claimed! +${bonusStars} Stars & +${bonusTickets} Tickets.`,
+    bonusStars,
+    bonusXp: 0,
+    bonusTickets,
+    profile: withRank(updated),
+  });
 });
 
+// --------------------------------------------------------------- Analytics Client Beacon & Match Summary
+app.post('/api/analytics/event', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const allowed = new Set(['session_start', 'session_end', 'mode_select']);
+  const eventType = String(req.body?.eventType || '');
+  if (!allowed.has(eventType)) return res.status(400).json({ error: 'Unsupported client event type' });
+  const id = AnalyticsService.track({
+    eventType: eventType as any,
+    userId: a.userId,
+    sessionId: a.sessionId,
+    mode: req.body?.mode ? String(req.body.mode).slice(0, 32) : undefined,
+    durationSeconds: Number.isFinite(Number(req.body?.durationSeconds)) ? Math.max(0, Math.min(86400, Number(req.body.durationSeconds))) : undefined,
+    metadata: req.body?.metadata && typeof req.body.metadata === 'object' ? req.body.metadata : undefined,
+  });
+  res.json({ success: true, id });
+});
 
 app.post('/api/match/summary', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
-  // §sec Reward-farming guard. The server-observed peak is consumed on the first submission,
-  // so a replayed call would be graded on client numbers alone and could mint the maximum
-  // clamped payout every time. Wall-clock pacing is the thing a script cannot fake.
   const paced = antiCheat.validateMatchSubmission(a.userId, Number(req.body?.survivalSeconds) || 0);
   if (!paced.ok) {
     if (paced.retryAfterMs) res.setHeader('Retry-After', String(Math.ceil(paced.retryAfterMs / 1000)));
     return res.status(429).json({ error: paced.reason || 'Match result rejected' });
   }
-  // §V7/§11 Server is the source of truth: bound the client report by what the simulation
-  // actually observed for this player (null for offline / local-engine play).
   const serverPeak = sessionManager.consumePlayerPeak(a.userId);
   const result = StatsService.recordMatch(a.userId, req.body || {}, serverPeak);
   if (!result) return res.status(404).json({ error: 'Profile not found' });
   const { authoritative, ...rest } = result;
+  lastMatchRewards.set(a.userId, {
+    stars: Math.max(0, Math.round(rest.earnedStars || 0)),
+    xp: Math.max(0, Math.round(rest.earnedXP || 0)),
+    doubled: false,
+    at: Date.now(),
+  });
   res.json({
     success: true,
     earnedStars: rest.earnedStars, earnedXP: rest.earnedXP, earnedEvoXP: rest.earnedEvoXP,
@@ -482,7 +956,6 @@ app.post('/api/match/summary', writeLimiter, (req, res) => {
   });
 });
 
-// §V7 Persisted match history for the Match History page.
 app.get('/api/player/history', (req, res) => {
   const a = auth(req, res); if (!a) return;
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 25));
@@ -491,25 +964,304 @@ app.get('/api/player/history', (req, res) => {
 
 app.post('/api/match/abandon', (req, res) => {
   const a = auth(req, res); if (!a) return;
-  sessionManager.consumePlayerPeak(a.userId); // discard server-observed peak on clean abandon
+  const peak = sessionManager.consumePlayerPeak(a.userId);
   sessionManager.findPlayerSession(a.userId)?.removePlayer(a.userId);
+  StatsService.recordMatch(a.userId, {
+    mode: String(req.body?.mode || 'classic'),
+    survivalSeconds: peak?.survivalSeconds ?? (Number(req.body?.survivalSeconds) || 0),
+    score: peak?.score ?? (Number(req.body?.score) || 0),
+    kills: peak?.kills ?? 0,
+    deaths: 0,
+    placement: 99,
+    abandoned: true,
+  }, peak);
   res.json({ success: true, message: 'Match abandoned cleanly' });
 });
 
 app.get('/api/screens/:screenId', (req, res) => {
-  if (!auth(req, res)) return; // §sec no reason for this to answer anonymous callers
+  if (!auth(req, res)) return;
   const valid = ['menu', 'matchmaking', 'play', 'pause', 'gameover', 'respawn', 'ad-reward', 'spectate'];
   if (!valid.includes(req.params.screenId)) return res.status(404).json({ error: `Screen not found` });
-  res.json({ screenId: req.params.screenId, status: 'active', config: { adInventoryReady: true, region: 'North America East 30Hz' } });
+  res.json({ screenId: req.params.screenId, status: 'active', config: { adInventoryReady: true, region: 'Global 30Hz' } });
 });
 
+// --------------------------------------------------------------- Admin Portal API (Strict RBAC)
 app.get('/api/admin/telemetry', (req, res) => {
   if (!adminAuth(req, res)) return;
-  res.json({ telemetry: AdminService.getTelemetry(sessionManager.getActiveModeCount(), connectedSockets.size), auditLogs: AdminService.getAuditLogs() });
+  res.json({
+    telemetry: AdminService.getTelemetry(
+      sessionManager.getActiveModeCount(),
+      connectedSockets.size,
+      presence.onlineCount(),
+      sessionManager.getAverageTickMs()
+    ),
+    auditLogs: AdminService.getAuditLogs(),
+  });
 });
 
-// --------------------------------------------------------------- §7 Coupon Management
-// Admin: full CRUD + enable/disable + redemption tracking. All admin-gated.
+app.get('/api/admin/audit-logs', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+  res.json({
+    adminLogs: AdminService.getAdminAuditLogs(limit),
+    antiCheatLogs: AdminService.getAuditLogs(),
+  });
+});
+
+app.post('/api/admin/system/backup', (req, res) => {
+  const a = superAdminAuth(req, res); if (!a) return;
+  const result = db.backupDatabase();
+  db.recordAdminAuditLog({
+    adminId: a.userId,
+    adminUsername: a.username,
+    action: 'database_backup_created',
+    details: { sizeBytes: result.sizeBytes },
+    ip: clientIp(req),
+  });
+  res.json({ success: true, fileName: result.filePath.split(/[\\/]/).pop(), sizeBytes: result.sizeBytes });
+});
+
+app.get('/api/admin/users', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  res.json(db.listUsers({
+    search: req.query.search ? String(req.query.search) : undefined,
+    role: req.query.role ? String(req.query.role) : undefined,
+    status: req.query.status ? String(req.query.status) : undefined,
+    limit: Number(req.query.limit) || 50,
+    offset: Number(req.query.offset) || 0,
+  }));
+});
+
+app.post('/api/admin/users/:id/status', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const status = String(req.body?.status || '') as UserStatus;
+  if (!['active', 'disabled', 'banned'].includes(status)) {
+    return res.status(400).json({ error: 'status must be active, disabled, or banned' });
+  }
+  const r = AuthService.setUserStatus(a.userId, req.params.id, status, clientIp(req));
+  if (!r.ok) return res.status(400).json(r);
+  res.json(r);
+});
+
+app.get('/api/admin/admins', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  const admins = db.listUsers({ role: 'admin', limit: 100 }).users;
+  const supers = db.listUsers({ role: 'super_admin', limit: 100 }).users;
+  res.json({ admins: [...supers, ...admins] });
+});
+
+app.post('/api/admin/admins', async (req, res) => {
+  const a = superAdminAuth(req, res); if (!a) return;
+  const { username, email, password, role } = req.body || {};
+  const targetRole = role === 'super_admin' ? 'super_admin' : 'admin';
+  const r = await AuthService.createAdminAccount(a.userId, String(username || ''), String(email || ''), String(password || ''), targetRole, clientIp(req));
+  if ('error' in r) return res.status(400).json(r);
+  res.json({ success: true, ...r });
+});
+
+// Admin Analytics & Reports
+app.get('/api/admin/analytics/overview', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  res.json(AnalyticsService.getOverview());
+});
+
+app.get('/api/admin/analytics/rpg', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  res.json(AnalyticsService.getRpgAnalytics());
+});
+
+// Admin RPG Content Management (Question Bank & Campaign/Quest/Boss/Event Overrides)
+app.get('/api/admin/content/questions', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  const questions = QuestionBankService.listQuestions({
+    category: req.query.category ? String(req.query.category) : undefined,
+    difficulty: req.query.difficulty ? Number(req.query.difficulty) : undefined,
+    status: req.query.status ? String(req.query.status) : undefined,
+    limit: req.query.limit ? Number(req.query.limit) : 120,
+  });
+  res.json({ questions });
+});
+
+app.post('/api/admin/content/questions', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const r = QuestionBankService.upsertQuestion(req.body || {});
+  if (!r.ok) return res.status(400).json(r);
+  db.recordAdminAuditLog({
+    adminId: a.userId,
+    adminUsername: a.username,
+    action: 'question_upserted',
+    targetType: 'question_bank',
+    targetId: r.question!.questionId,
+    details: { category: r.question!.category, difficulty: r.question!.difficulty, status: r.question!.status },
+    ip: clientIp(req),
+  });
+  res.json(r);
+});
+
+app.delete('/api/admin/content/questions/:id', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const ok = QuestionBankService.deleteQuestion(String(req.params.id || ''));
+  if (!ok) return res.status(404).json({ error: 'Question not found' });
+  db.recordAdminAuditLog({
+    adminId: a.userId,
+    adminUsername: a.username,
+    action: 'question_deleted',
+    targetType: 'question_bank',
+    targetId: String(req.params.id),
+    ip: clientIp(req),
+  });
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/content/overrides', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  const rows = db.getRawDb().prepare('SELECT * FROM content_overrides ORDER BY updated_at DESC LIMIT 200').all() as any[];
+  res.json({
+    overrides: rows.map(r => ({
+      entityType: r.entity_type,
+      entityId: r.entity_id,
+      payload: JSON.parse(r.payload_json || '{}'),
+      status: r.status,
+      updatedBy: r.updated_by,
+      updatedAt: r.updated_at,
+    })),
+  });
+});
+
+app.put('/api/admin/content/overrides', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const entityType = String(req.body?.entityType || '').trim();
+  const entityId = String(req.body?.entityId || '').trim();
+  const payload = req.body?.payload;
+  const status = ['published', 'draft'].includes(String(req.body?.status)) ? String(req.body.status) : 'published';
+  const validTypes = ['campaign_level', 'quest', 'npc', 'boss', 'world_event', 'team_objective'];
+  if (!validTypes.includes(entityType) || !entityId || !payload || typeof payload !== 'object') {
+    return res.status(400).json({ error: `Invalid override: entityType must be one of ${validTypes.join(', ')}` });
+  }
+  const now = new Date().toISOString();
+  db.getRawDb().prepare(`
+    INSERT OR REPLACE INTO content_overrides (entity_type, entity_id, payload_json, status, updated_by, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(entityType, entityId, JSON.stringify(payload), status, a.username, now);
+
+  db.recordAdminAuditLog({
+    adminId: a.userId,
+    adminUsername: a.username,
+    action: 'content_override_saved',
+    targetType: entityType,
+    targetId: entityId,
+    details: { status },
+    ip: clientIp(req),
+  });
+  res.json({
+    ok: true,
+    override: { entityType, entityId, payload, status, updatedBy: a.username, updatedAt: now },
+    preview: entityType === 'campaign_level' && /^lvl_\d+$/.test(entityId)
+      ? AdventureProgressionService.getLevelDef(Number(entityId.slice(4)))
+      : payload,
+  });
+});
+
+app.delete('/api/admin/content/overrides/:type/:id', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  db.getRawDb().prepare('DELETE FROM content_overrides WHERE entity_type = ? AND entity_id = ?')
+    .run(String(req.params.type), String(req.params.id));
+  db.recordAdminAuditLog({
+    adminId: a.userId,
+    adminUsername: a.username,
+    action: 'content_override_deleted',
+    targetType: String(req.params.type),
+    targetId: String(req.params.id),
+    ip: clientIp(req),
+  });
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/analytics/reports', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  const periodRaw = String(req.query.period || 'weekly');
+  const period: ReportPeriod = ['daily', 'weekly', 'monthly', 'yearly', 'custom'].includes(periodRaw)
+    ? (periodRaw as ReportPeriod)
+    : 'weekly';
+  const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+  const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+  res.json(AnalyticsService.getReport(period, startDate, endDate));
+});
+
+app.get('/api/admin/analytics/reports/export', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const periodRaw = String(req.query.period || 'weekly');
+  const period: ReportPeriod = ['daily', 'weekly', 'monthly', 'yearly', 'custom'].includes(periodRaw)
+    ? (periodRaw as ReportPeriod)
+    : 'weekly';
+  const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+  const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+  const report = AnalyticsService.getReport(period, startDate, endDate);
+  const csv = AnalyticsService.toCsv(report);
+  db.recordAdminAuditLog({
+    adminId: a.userId,
+    adminUsername: a.username,
+    action: 'report_exported_csv',
+    details: { period, startDate: report.startDate, endDate: report.endDate },
+    ip: clientIp(req),
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="anaconda-report-${period}-${report.startDate}-to-${report.endDate}.csv"`);
+  res.send(csv);
+});
+
+// Admin Advertisement CMS
+app.get('/api/admin/ads', (req, res) => {
+  if (!adminAuth(req, res)) return;
+  res.json({ ads: AdManagerService.listAll() });
+});
+
+app.post('/api/admin/ads/upload', (req, res, next) => {
+  if (!adminAuth(req, res)) return;
+  upload.single('file')(req, res, (err: any) => {
+    if (err) return res.status(400).json({ error: err.message || 'File upload failed' });
+    if (!req.file?.buffer) return res.status(400).json({ error: 'No file attached in "file" field' });
+    const saved = AdManagerService.saveCreativeFile(req.file.buffer);
+    if (!saved.ok) return res.status(400).json({ error: saved.error });
+    res.json({ success: true, mediaUrl: saved.mediaUrl, mediaType: saved.mediaType });
+  });
+});
+
+app.post('/api/admin/ads', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const r = AdManagerService.create({ id: a.userId, username: a.username }, req.body || {}, clientIp(req));
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  res.json({ success: true, ad: r.ad });
+});
+
+app.patch('/api/admin/ads/:id', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const r = AdManagerService.update({ id: a.userId, username: a.username }, req.params.id, req.body || {}, clientIp(req));
+  if (!r.ok) return res.status(r.error === 'Advertisement not found' ? 404 : 400).json({ error: r.error });
+  res.json({ success: true, ad: r.ad });
+});
+
+app.post('/api/admin/ads/:id/enable', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const r = AdManagerService.update({ id: a.userId, username: a.username }, req.params.id, { enabled: true }, clientIp(req));
+  if (!r.ok) return res.status(404).json({ error: r.error });
+  res.json({ success: true, ad: r.ad });
+});
+
+app.post('/api/admin/ads/:id/disable', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const r = AdManagerService.update({ id: a.userId, username: a.username }, req.params.id, { enabled: false }, clientIp(req));
+  if (!r.ok) return res.status(404).json({ error: r.error });
+  res.json({ success: true, ad: r.ad });
+});
+
+app.delete('/api/admin/ads/:id', (req, res) => {
+  const a = adminAuth(req, res); if (!a) return;
+  const deleted = AdManagerService.remove({ id: a.userId, username: a.username }, req.params.id, clientIp(req));
+  res.json({ success: deleted });
+});
+
+// Admin Coupon Management
 app.get('/api/admin/coupons', (req, res) => {
   if (!adminAuth(req, res)) return;
   res.json({ coupons: CouponService.list() });
@@ -546,11 +1298,9 @@ app.get('/api/admin/coupons/:id/redemptions', (req, res) => {
   res.json({ redemptions: CouponService.redemptions(req.params.id) });
 });
 
-// Player: list claimable coupons + claim one (server-driven grant into inventory).
 app.get('/api/coupons/available', (req, res) => {
   const a = auth(req, res); if (!a) return;
-  const region = (req.query.region as string) || 'Global';
-  res.json({ coupons: CouponService.availableFor(a.userId, region) });
+  res.json({ coupons: CouponService.availableFor(a.userId, (req.query.region as string) || 'Global') });
 });
 app.post('/api/coupons/claim', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
@@ -560,20 +1310,18 @@ app.post('/api/coupons/claim', writeLimiter, (req, res) => {
   res.json({ ...result, profile: withRank(result.profile) });
 });
 
-// §8 Lobby presence heartbeat — keeps a player "online" for friends while browsing menus.
+// --------------------------------------------------------------- Social & Presence
 app.post('/api/presence/ping', (req, res) => {
   const a = auth(req, res); if (!a) return;
   presence.heartbeat(a.userId);
+  db.touchUserActivity(a.userId);
   res.json({ ok: true });
 });
 
-// --------------------------------------------------------------- §8 Social (server-driven)
 app.get('/api/social/overview', (req, res) => {
   const a = auth(req, res); if (!a) return;
   res.json(SocialService.overview(a.userId));
 });
-// Accepts an exact username OR a shareable friend code — both arrive in the same field so
-// the UI can offer a single "username or friend code" box.
 app.post('/api/social/request', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const query = req.body?.query ?? req.body?.friendCode ?? req.body?.username;
@@ -601,29 +1349,20 @@ app.post('/api/social/unblock', (req, res) => {
   const r = SocialService.unblock(a.userId, String(req.body?.userId || ''));
   res.json({ ...r, ...SocialService.overview(a.userId) });
 });
-// Invite a friend to play. The invite is PERSISTED, then also pushed live if they happen to
-// be connected — so inviting someone who is away no longer just fails, it waits for them.
 app.post('/api/social/invite', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const otherId = String(req.body?.userId || '');
-  // Prefer the mode the sender is actually playing; fall back to what the client asked for.
   const liveMode = connectedSockets.get([...connectedSockets].find(([, u]) => u.userId === a.userId)?.[0] || '')?.mode;
   const mode = String(req.body?.mode || liveMode || 'free_roam');
-
   const result = SocialService.invite(a.userId, otherId, mode);
   if (!result.success) return res.status(400).json({ success: false, message: result.message });
-
   if (result.online) deliverInvites(otherId);
   res.json({ success: true, message: result.message, online: result.online });
 });
-
-// A recipient's pending invites.
 app.get('/api/social/invites', (req, res) => {
   const a = auth(req, res); if (!a) return;
   res.json({ invites: SocialService.pendingInvites(a.userId) });
 });
-
-// Accept (returns the mode to launch) or decline. Consumes the invite either way.
 app.post('/api/social/invites/respond', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const action = req.body?.action === 'accept' ? 'accept' : 'decline';
@@ -631,27 +1370,18 @@ app.post('/api/social/invites/respond', writeLimiter, (req, res) => {
   res.status(r.success ? 200 : 400).json({ ...r, invites: SocialService.pendingInvites(a.userId) });
 });
 
-// Liveness/readiness probe for hosting platforms + uptime checks.
-// Exposed under BOTH paths on purpose: `/health` is what platform health checks hit, while
-// `/api/health` is the one that survives a reverse proxy that only forwards `/api/*` — the
-// client's latency probe uses that one so it works in every deployment shape.
+// Health & Error Handling
 const health = (_req: express.Request, res: express.Response) =>
   res.json({ status: 'ok', uptime: process.uptime(), modes: sessionManager.getActiveModeCount() });
 app.get('/health', health);
 app.get('/api/health', health);
 
-// Unknown API route → clean JSON 404 (never an HTML error page the client can't parse).
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
-
-// Central error handler — any thrown/next(err) returns JSON, never leaks a stack trace.
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[api-error]', err?.message || err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// §social Push a user's pending invites to every socket they have open. Called when an
-// invite arrives for someone already online, and again as soon as they authenticate — which
-// is what makes an invite sent while they were away actually reach them.
 function deliverInvites(userId: string) {
   const invites = db.getMatchInvites(userId);
   if (!invites.length) return;
@@ -663,9 +1393,23 @@ function deliverInvites(userId: string) {
   if (delivered) db.markInvitesDelivered(userId);
 }
 
-// --------------------------------------------------------------- realtime
+function resolveUserSession(user: SocketUser): GameSessionService {
+  return sessionManager.getRoomById(user.roomId) || sessionManager.getSession(user.mode);
+}
+
+// --------------------------------------------------------------- Realtime Socket.IO
 io.on('connection', (socket) => {
-  socket.on('authenticate', (data: { token: string; skin?: string; mode?: GameMode; region?: string; matchType?: string }) => {
+  socket.on('authenticate', (data: {
+    token: string;
+    skin?: string;
+    mode?: GameMode;
+    region?: string;
+    matchType?: string;
+    roomId?: string;
+    roomCode?: string;
+    kingdom?: number;
+    withBots?: boolean;
+  }) => {
     const a = AuthService.verifyToken(data.token);
     if (!a) { socket.emit('auth_error', { message: 'Authentication failed' }); return; }
 
@@ -673,53 +1417,126 @@ io.on('connection', (socket) => {
     const profile = db.getProfile(a.userId);
     const skin = data.skin || profile?.equippedSkin || 'Forest';
     const evolution = profile?.equippedEvolution || 'Baby';
-    const region = (data.matchType === 'local' ? '📍 ' : '') + (data.region || 'Global');
+    const regionRaw = String(data.region || 'Global');
+    const region = (data.matchType === 'local' ? '📍 ' : '') + regionRaw;
+    const kingdom = Number(data.kingdom) || (profile?.explorer as any)?.kingdom || 1;
 
-    // Leave any previous mode room, join the new one
-    const prev = connectedSockets.get(socket.id);
-    if (prev && prev.mode !== mode) {
-      socket.leave(prev.mode);
-      sessionManager.findPlayerSession(a.userId)?.removePlayer(a.userId);
+    // Resolve target room (explicit roomId, roomCode, or matchmaking)
+    let session: GameSessionService | undefined;
+    let roomId = '';
+    if (data.roomId) {
+      const authRoom = sessionManager.authorizeSocketJoin(String(data.roomId), a.userId, data.roomCode);
+      if (!authRoom.ok) {
+        socket.emit('auth_error', { message: authRoom.error || 'Unauthorized room access' });
+        return;
+      }
+      session = sessionManager.getRoomById(String(data.roomId));
+      if (session) roomId = session.getState().matchId;
+    } else if (data.roomCode) {
+      const found = sessionManager.getRoomByCode(String(data.roomCode));
+      if (found) {
+        sessionManager.authorizeAndJoinLobby(found.roomId, a.userId, a.username, data.roomCode);
+        session = sessionManager.getRoomById(found.roomId);
+        roomId = found.roomId;
+      }
+    }
+    if (!session) {
+      const room = sessionManager.findOrCreateMatchmakingRoom(mode, regionRaw, kingdom, data.withBots ?? (mode === 'battle_royale' || mode === 'team'));
+      session = room.session;
+      roomId = room.roomId;
     }
 
-    // worldVersion 0 forces the first tick to carry the full obstacle/wormhole layout.
-    connectedSockets.set(socket.id, { userId: a.userId, username: a.username, mode, skin, evolution, region, lastSeq: 0, worldVersion: 0, viewRadius: DEFAULT_VIEW_RADIUS });
-    presence.add(a.userId); // §8 mark online for friends' status
-    socket.join(mode);
+    const prev = connectedSockets.get(socket.id);
+    if (prev && prev.roomId !== roomId) {
+      socket.leave(prev.roomId);
+      resolveUserSession(prev).removePlayer(a.userId);
+    }
 
-    const session = sessionManager.getSession(mode);
-    session.setOnPickupCallback((userId, foodId, foodType, updatedMissions) => {
-      for (const [sid, conn] of connectedSockets) {
-        if (conn.userId === userId) {
-          io.to(sid).emit('pickup_event', {
-            type: 'pickup_event',
-            foodId,
-            foodType,
-            updatedMissions,
-            profile: db.getProfile(userId),
-          });
-        }
-      }
+    connectedSockets.set(socket.id, {
+      userId: a.userId,
+      username: a.username,
+      mode,
+      roomId,
+      skin,
+      evolution,
+      region,
+      lastSeq: 0,
+      worldVersion: 0,
+      viewRadius: DEFAULT_VIEW_RADIUS,
+      joinedAt: Date.now(),
     });
+    presence.add(a.userId);
+    socket.join(roomId);
+
+    const emitToUser = (targetUid: string, event: string, dataPayload: any) => {
+      for (const [sid, conn] of connectedSockets) {
+        if (conn.userId === targetUid) io.to(sid).emit(event, dataPayload);
+      }
+    };
+
+    session.setOnPickupCallback((userId, foodId, foodType, updatedMissions) => {
+      emitToUser(userId, 'pickup_event', {
+        type: 'pickup_event',
+        foodId,
+        foodType,
+        updatedMissions,
+        profile: db.getProfile(userId),
+      });
+    });
+
+    session.setOnNpcEncounter((userId, encounter) => {
+      emitToUser(userId, 'npc_encounter', encounter);
+    });
+
+    session.setOnQuestUpdate((userId, update) => {
+      emitToUser(userId, 'quest_update', update);
+    });
+
+    session.setOnWorldFeedback((userId, x, y, text, color) => {
+      emitToUser(userId, 'world_feedback', { x, y, text, color });
+    });
+
     const snake = session.registerPlayer(a.userId, a.username, skin, false, evolution, region);
-    socket.emit('authenticated', { userId: a.userId, snake, mode, region, config: session.getConfig() });
-    // Anything a friend sent while this player was away lands now.
+    AnalyticsService.track({
+      eventType: 'match_start',
+      userId: a.userId,
+      sessionId: a.sessionId,
+      mode,
+      roomId,
+      metadata: { kingdom, region: regionRaw },
+    });
+
+    const activeQuest = QuestEngineService.getActiveMainQuest(a.userId);
+    const activeQuiz = activeQuest?.quizSessionId
+      ? QuestionBankService.getSession(a.userId, activeQuest.quizSessionId)?.currentQuestion || null
+      : null;
+    const npcQuotas = QuestEngineService.getAllNpcQuotas(a.userId);
+    const rewardBox = RewardBoxService.listBox(a.userId);
+
+    socket.emit('authenticated', {
+      userId: a.userId,
+      snake,
+      mode,
+      roomId,
+      region,
+      config: session.getConfig(),
+      activeQuest,
+      activeQuiz,
+      npcQuotas,
+      unclaimedRewardBoxCount: rewardBox.unclaimedCount,
+    });
     deliverInvites(a.userId);
   });
 
   socket.on('client_input', (data: { seq: number; angle: number; boosting: boolean }) => {
     const user = connectedSockets.get(socket.id);
     if (!user) return;
-    // §sec Replay/reorder protection — only accept strictly-increasing sequence numbers,
-    // so a captured input frame can't be replayed and stale/duplicate frames are dropped.
     const seq = Number(data?.seq);
     if (!Number.isFinite(seq) || seq <= user.lastSeq) return;
     user.lastSeq = seq;
-    sessionManager.getSession(user.mode).handlePlayerInput(user.userId, data.angle, !!data.boosting, seq);
+    resolveUserSession(user).handlePlayerInput(user.userId, data.angle, !!data.boosting, seq);
   });
 
-  // §net The client reports how much world it can actually see (viewport ÷ zoom). Clamped
-  // here so it is only ever a bandwidth hint, never a way to demand extra world data.
   socket.on('view_radius', (data: { radius?: number }) => {
     const user = connectedSockets.get(socket.id);
     if (!user) return;
@@ -731,14 +1548,26 @@ io.on('connection', (socket) => {
   socket.on('activate_ability', () => {
     const user = connectedSockets.get(socket.id);
     if (!user) return;
-    const used = sessionManager.getSession(user.mode).activateAbility(user.userId);
+    const used = resolveUserSession(user).activateAbility(user.userId);
     socket.emit('ability_result', { used });
   });
 
-  socket.on('respawn', (data: { method?: string }) => {
+  socket.on('respawn', (data: { method?: string; adToken?: string }) => {
     const user = connectedSockets.get(socket.id);
     if (!user) return;
+    const session = resolveUserSession(user);
+    if (session.getState().mode === 'battle_royale') {
+      socket.emit('respawn_result', { success: false, message: 'No respawns allowed in Battle Royale' });
+      return;
+    }
     const method = data?.method || 'wait';
+    if (method === 'ad') {
+      const verified = AdManagerService.consumeRewardToken(user.userId, String(data?.adToken || ''));
+      if (!verified.ok) {
+        socket.emit('respawn_result', { success: false, message: verified.error });
+        return;
+      }
+    }
     const cost = RESPAWN_COST[method] || RESPAWN_COST.wait;
     const profile = db.getProfile(user.userId);
     if (!profile) { socket.emit('respawn_result', { success: false, message: 'No profile' }); return; }
@@ -750,88 +1579,122 @@ io.on('connection', (socket) => {
       ? db.updateProfile(user.userId, { stars: profile.stars - cost.stars, tickets: profile.tickets - cost.tickets })
       : profile;
 
-    const snake = sessionManager.getSession(user.mode).respawnPlayer(user.userId, user.username, user.skin, user.evolution, user.region);
+    const snake = session.respawnPlayer(user.userId, user.username, user.skin, user.evolution, user.region);
     socket.emit('respawn_result', { success: true, snake, profile: withRank(updatedProfile), method });
   });
 
-  // §12 Mobile pause — client backgrounded (home/lock/call): mark inactive, no damage.
   socket.on('player_pause', () => {
     const user = connectedSockets.get(socket.id);
-    if (user) sessionManager.getSession(user.mode).setPlayerInactive(user.userId, true);
+    if (user) resolveUserSession(user).setPlayerInactive(user.userId, true);
   });
   socket.on('player_resume', () => {
     const user = connectedSockets.get(socket.id);
-    if (user) sessionManager.getSession(user.mode).setPlayerInactive(user.userId, false);
+    if (user) resolveUserSession(user).setPlayerInactive(user.userId, false);
+  });
+  socket.on('npc_interact_request', (data: { npcId?: string }) => {
+    const user = connectedSockets.get(socket.id);
+    if (!user || !data?.npcId) return;
+    const check = resolveUserSession(user).validateManualNpcInteract(user.userId, String(data.npcId));
+    if (check.ok && check.encounter) {
+      socket.emit('npc_encounter', check.encounter);
+    } else {
+      socket.emit('npc_interact_error', { error: check.error || 'Cannot interact' });
+    }
+  });
+  socket.on('interaction_end', () => {
+    const user = connectedSockets.get(socket.id);
+    if (user) resolveUserSession(user).setPlayerInteraction(user.userId, false);
+  });
+  socket.on('map_planning', (data: { active?: boolean }) => {
+    const user = connectedSockets.get(socket.id);
+    if (user) resolveUserSession(user).setPlayerMapPlanning(user.userId, Boolean(data?.active));
+  });
+  socket.on('use_powerup', (data: { powerupId?: string }) => {
+    const user = connectedSockets.get(socket.id);
+    if (!user || !data?.powerupId) return;
+    const pid = String(data.powerupId) as 'pw_boost' | 'pw_shield' | 'pw_super';
+    const consumed = RewardBoxService.consumePowerup(user.userId, pid);
+    if (consumed.ok) {
+      resolveUserSession(user).applyPurchasedPowerup(user.userId, pid);
+      socket.emit('powerup_used', { ok: true, powerupId: pid, remaining: consumed.remaining });
+    } else {
+      socket.emit('powerup_used', { ok: false, error: consumed.error });
+    }
   });
 
   socket.on('disconnect', () => {
     const user = connectedSockets.get(socket.id);
     if (user) {
-      sessionManager.getSession(user.mode).handlePlayerDisconnect(user.userId);
+      const session = resolveUserSession(user);
+      session.handlePlayerDisconnect(user.userId);
       connectedSockets.delete(socket.id);
-      presence.remove(user.userId); // §8 last socket gone → offline
+      const hasOtherSocket = Array.from(connectedSockets.values()).some(u => u.userId === user.userId);
+      if (!hasOtherSocket) {
+        antiCheat.forget(user.userId);
+      }
+      presence.remove(user.userId);
+      const dur = Math.max(0, Math.round((Date.now() - user.joinedAt) / 1000));
+      AnalyticsService.track({
+        eventType: 'session_end',
+        userId: user.userId,
+        mode: user.mode,
+        roomId: user.roomId,
+        durationSeconds: dur,
+      });
     }
   });
 });
 
-// §net Interest-managed broadcast @ 30 Hz.
-//
-// Each mode's shared snapshot is built ONCE per tick, then every connected socket gets a view
-// tailored to it: food culled to what it could actually draw, and the near-static world layout
-// (obstacles/wormholes) only when its cached copy is stale. Emitting per-socket costs a little
-// more CPU than a room broadcast but cuts per-client bandwidth by roughly an order of
-// magnitude, which is the resource that actually runs out first.
-// A phone at full zoom-out sees ~900 world units; a 4K desktop sees ~4000. The client reports
-// its own view radius (see the `view_radius` handler) so neither gets shortchanged: nothing
-// ever pops into view, and small screens — the ones most likely on metered data — send far
-// less. Clamped server-side so the value is never a lever a client can abuse.
+// --------------------------------------------------------------- 30 Hz Interest-Managed Broadcast
 const DEFAULT_VIEW_RADIUS = 2200;
 const MIN_VIEW_RADIUS = 700;
-const MAX_VIEW_RADIUS = 4400; // beyond half the world diagonal → effectively "send it all"
-setInterval(() => {
-  const shared = new Map<GameMode, ReturnType<typeof buildShared>>();
-  function buildShared(session: ReturnType<typeof sessionManager.getSession>) {
-    return session.buildSharedSnapshot();
-  }
+const MAX_VIEW_RADIUS = 4400;
+
+const broadcastTimer = setInterval(() => {
+  if (connectedSockets.size === 0) return;
+
+  const shared = new Map<string, ReturnType<GameSessionService['buildSharedSnapshot']>>();
   for (const session of sessionManager.getActiveSessions()) {
-    shared.set(session.getState().mode, buildShared(session));
+    const roomId = session.getState().matchId;
+    shared.set(roomId, session.buildSharedSnapshot());
   }
 
   const now = Date.now();
   for (const [sid, user] of connectedSockets) {
-    const base = shared.get(user.mode);
+    const session = resolveUserSession(user);
+    const base = shared.get(session.getState().matchId);
     if (!base) continue;
-    const session = sessionManager.getSession(user.mode);
     const head = session.getHeadPosition(user.userId);
 
     const radius = user.viewRadius || DEFAULT_VIEW_RADIUS;
     const payload: any = {
       ...base,
+      roomId: user.roomId,
       timestamp: now,
       snakes: session.viewSnakes(base.snakes, head, radius),
       food: session.foodNear(head, radius),
     };
-    // Ship the layout only when this client's cached version is behind.
     if (user.worldVersion !== base.worldVersion) {
       const layout = session.getWorldLayout();
       payload.obstacles = layout.obstacles;
       payload.portals = layout.portals;
-      payload.npcs = layout.npcs; // §explorer villagers ride the cached layout — they never move
+      payload.npcs = layout.npcs;
       user.worldVersion = base.worldVersion;
     }
     io.to(sid).emit('game_state_tick', payload);
   }
 }, 1000 / 30);
+broadcastTimer.unref?.();
 
 const PORT = Number(process.env.PORT) || 4000;
-// Bind all interfaces explicitly. Containerised hosts (Render/Railway/Fly) route to the
-// container's external address, and a server bound only to loopback fails their health check
-// with no useful error — it just never becomes reachable.
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`=======================================================`);
-  console.log(` ANACONDA PARK — AUTHORITATIVE SERVER RUNNING ON :${PORT}`);
-  console.log(` Modes: Classic · Battle Royale · Team · Event  @ 30 Hz`);
-  console.log(`=======================================================`);
-});
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`=======================================================`);
+    console.log(` ANACONDA PARK — AUTHORITATIVE SERVER RUNNING ON :${PORT}`);
+    console.log(` Modes: Classic · Battle Royale · Team · Event · Boss @ 30Hz`);
+    console.log(`=======================================================`);
+  });
+}
 
+export { app, server, io };
 export default app;

@@ -162,7 +162,7 @@ export class SocialService {
 
   // Send an invite. Always stored (so it survives the recipient being away); the caller
   // pushes it live as well when they happen to be connected.
-  static invite(userId: string, otherId: string, mode: string): { success: boolean; message: string; invite?: MatchInvite; online: boolean } {
+  static invite(userId: string, otherId: string, mode: string, roomId?: string): { success: boolean; message: string; invite?: MatchInvite; online: boolean } {
     const gate = this.canInvite(userId, otherId);
     if (!gate.ok) return { success: false, message: gate.message, online: false };
 
@@ -170,7 +170,7 @@ export class SocialService {
     const me = this.profileCard(userId);
     const invite = db.addMatchInvite({
       fromUserId: userId, fromName: me.name, fromAvatar: me.avatar,
-      toUserId: otherId, mode: safeMode,
+      toUserId: otherId, mode: safeMode, roomId,
     });
 
     const online = presence.isOnline(otherId);

@@ -1,78 +1,96 @@
-// §14 AdMob integration boundary.
-//
-// Real ads require the Google Mobile Ads Capacitor plugin (e.g. @capacitor-community/admob)
-// plus YOUR own AdMob app id + ad-unit ids. Until those are configured, every method falls
-// back to a no-op or the built-in simulated rewarded ad, so dev/web keeps working.
-// NO live ad ids ship in this repo — set them via configure() at app start.
-//
-// Policy (sprint §14): rewarded + interstitial + app-open allowed; banners are LOBBY-ONLY;
-// never show intrusive ads during active gameplay.
+import { api, resolveMediaUrl } from '../api/ApiClient';
 
 export type AdUnit = 'rewarded' | 'interstitial' | 'banner' | 'appOpen';
+export type AdPlacement = 'home_screen' | 'between_sessions' | 'game_over' | 'story_menu' | 'rewarded_opt_in';
 
-export interface AdConfig {
-  enabled: boolean;                     // master switch — flip on once ids + plugin are set
-  appId: string;                        // AdMob application id
-  units: Record<AdUnit, string>;        // ad-unit ids
-  testMode: boolean;                    // use Google test ads while integrating
+export interface ServedAd {
+  id: string;
+  title: string;
+  description: string;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  destinationUrl: string;
+  placement: AdPlacement;
 }
 
-const DEFAULT_CONFIG: AdConfig = {
-  enabled: false,
-  appId: '',
-  units: { rewarded: '', interstitial: '', banner: '', appOpen: '' },
-  testMode: true,
-};
+export interface AdConfig {
+  enabled: boolean;
+  appId: string;
+  units: Record<AdUnit, string>;
+  testMode: boolean;
+}
 
 export class AdService {
-  private cfg: AdConfig = DEFAULT_CONFIG;
-  private plugin: any = null; // assign the AdMob plugin instance once installed
+  private cfg: AdConfig = {
+    enabled: false,
+    appId: '',
+    units: { rewarded: '', interstitial: '', banner: '', appOpen: '' },
+    testMode: true,
+  };
+  private cache: Map<string, { at: number; ads: ServedAd[] }> = new Map();
+  private rewardedWatchAdId: string | undefined;
 
-  /** Configure ad ids + toggle. Call once at startup (see main.ts). */
-  configure(partial: Partial<AdConfig>): void { this.cfg = { ...this.cfg, ...partial }; }
+  configure(partial: Partial<AdConfig>): void {
+    this.cfg = { ...this.cfg, ...partial };
+  }
 
-  /** Inject the native AdMob plugin (from @capacitor-community/admob) when available. */
-  attachPlugin(plugin: any): void { this.plugin = plugin; }
+  attachPlugin(_plugin: any): void { /* Native AdMob bridge hook */ }
 
-  isEnabled(): boolean { return this.cfg.enabled && !!this.plugin; }
+  isEnabled(): boolean {
+    return this.cfg.enabled;
+  }
 
-  /**
-   * Show a rewarded ad. Resolves true when the reward should be granted.
-   * `simulate(done)` runs the built-in 5s reward modal used on web / when ads are off.
-   */
-  async showRewarded(simulate: (done: () => void) => void): Promise<boolean> {
-    if (this.isEnabled() && this.cfg.units.rewarded) {
-      try {
-        // await this.plugin.prepareRewardVideoAd({ adId: this.cfg.units.rewarded, isTesting: this.cfg.testMode });
-        // const result = await this.plugin.showRewardVideoAd();
-        // return !!result?.rewarded;
-        return true; // TODO: wire the plugin call above once ids are set
-      } catch { return false; }
+  clearCache() {
+    this.cache.clear();
+  }
+
+  async fetchPlacement(placement: AdPlacement, force = false): Promise<ServedAd[]> {
+    const cached = this.cache.get(placement);
+    if (!force && cached && Date.now() - cached.at < 15_000) {
+      return cached.ads;
     }
+    const res = await api(`/api/ads/serve?placement=${encodeURIComponent(placement)}`);
+    const adsList: ServedAd[] = res.ok && Array.isArray(res.data?.ads)
+      ? res.data.ads.map((a: any) => ({ ...a, mediaUrl: resolveMediaUrl(a.mediaUrl) }))
+      : [];
+    this.cache.set(placement, { at: Date.now(), ads: adsList });
+    return adsList;
+  }
+
+  async track(adId: string, placement: AdPlacement, eventType: 'impression' | 'click'): Promise<void> {
+    if (!adId) return;
+    await api('/api/ads/track', {
+      method: 'POST',
+      body: JSON.stringify({ adId, placement, eventType }),
+    });
+  }
+
+  async startRewardedWatch(): Promise<{ ok: boolean; tokenId?: string; minWatchMs: number; ad?: ServedAd; error?: string }> {
+    const adsList = await this.fetchPlacement('rewarded_opt_in', true);
+    const ad = adsList[0];
+    this.rewardedWatchAdId = ad?.id;
+    const res = await api('/api/ads/reward-start', {
+      method: 'POST',
+      body: JSON.stringify({ adId: ad?.id }),
+    });
+    if (!res.ok) {
+      return { ok: false, minWatchMs: 4000, error: res.data?.error || 'Could not start rewarded ad' };
+    }
+    if (ad?.id) void this.track(ad.id, 'rewarded_opt_in', 'impression');
+    return { ok: true, tokenId: res.data.tokenId, minWatchMs: res.data.minWatchMs ?? 4000, ad };
+  }
+
+  getLastRewardedAdId(): string | undefined {
+    return this.rewardedWatchAdId;
+  }
+
+  async showRewarded(simulate: (done: () => void) => void): Promise<boolean> {
     return new Promise<boolean>(resolve => simulate(() => resolve(true)));
   }
 
-  /** Interstitial between screens (e.g. returning to the lobby). No-op until enabled. */
-  async showInterstitial(): Promise<void> {
-    if (!this.isEnabled() || !this.cfg.units.interstitial) return;
-    try {
-      // await this.plugin.prepareInterstitial({ adId: this.cfg.units.interstitial, isTesting: this.cfg.testMode });
-      // await this.plugin.showInterstitial();
-    } catch { /* ignore ad failures */ }
-  }
-
-  /** Lobby-only banner. No-op until enabled; never call during active gameplay. */
-  async showBanner(): Promise<void> {
-    if (!this.isEnabled() || !this.cfg.units.banner) return;
-    try {
-      // await this.plugin.showBanner({ adId: this.cfg.units.banner, isTesting: this.cfg.testMode, position: 'BOTTOM_CENTER' });
-    } catch { /* */ }
-  }
-
-  async hideBanner(): Promise<void> {
-    if (!this.isEnabled()) return;
-    try { /* await this.plugin.hideBanner(); */ } catch { /* */ }
-  }
+  async showInterstitial(): Promise<void> { /* Safe between-screen hook only */ }
+  async showBanner(): Promise<void> { /* Managed per placement container */ }
+  async hideBanner(): Promise<void> { /* Managed per placement container */ }
 }
 
 export const ads = new AdService();

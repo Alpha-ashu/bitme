@@ -2,6 +2,7 @@ import { db } from '../db/Database';
 import { gameConfig } from '../config/GameConfig';
 import { ProgressionService } from './ProgressionService';
 import { CouponService } from './CouponService';
+import { AnalyticsService } from './AnalyticsService';
 import { PlayerProfile, PlayerStats, ModeStat, StatMode, MatchRecord } from '../types';
 
 // §V7 Centralized, server-authoritative match completion + statistics.
@@ -18,7 +19,7 @@ export interface MatchInput {
   survivalSeconds?: number; distanceKm?: number; areasVisited?: number;
   cherriesEaten?: number; applesEaten?: number; frogsEaten?: number; powerupsEaten?: number;
   damageDealt?: number; damageReceived?: number; killStreak?: number;
-  mode?: string; map?: string;
+  mode?: string; map?: string; roomId?: string; abandoned?: boolean;
 }
 
 export interface ServerPeak { score: number; kills: number; killStreak: number; survivalSeconds: number; }
@@ -86,8 +87,11 @@ export class StatsService {
       killStreak = Math.min(Math.max(killStreak, serverPeak.killStreak), serverPeak.kills || killStreak);
       survivalSeconds = Math.min(survivalSeconds || serverPeak.survivalSeconds, serverPeak.survivalSeconds);
     }
-    const deaths = clamp(raw.deaths, 0, 50) || 1; // a completed match implies at least one death
     const placement = Math.round(clamp(raw.placement, 1, 100));
+    const won = placement === 1 && !(raw as any).abandoned;
+    const rawDeaths = clamp(raw.deaths, 0, 50);
+    const deaths = raw.deaths === undefined ? (won ? 0 : 1) : rawDeaths;
+    const abandoned = Boolean((raw as any).abandoned);
     const distanceKm = clamp(raw.distanceKm, 0, cl.maxDistanceKm);
     const cherries = Math.round(clamp(raw.cherriesEaten, 0, 10000));
     const apples = Math.round(clamp(raw.applesEaten, 0, 10000));
@@ -101,7 +105,6 @@ export class StatsService {
     // single winner), so they are bounded by the kills that actually happened around you.
     const assists = Math.round(clamp((raw as any).assists, 0, cl.maxKills));
     const statMode = toStatMode(raw.mode);
-    const won = placement === 1;
 
     // ---- Rewards (config-driven formula) ----
     const m = gameConfig.economy.match;
@@ -198,9 +201,18 @@ export class StatsService {
       rank: placement,
       rewards: rewardsText,
       map: raw.map,
-      result: won ? 'win' : 'loss',
+      result: abandoned ? 'loss' : (won ? 'win' : 'loss'),
     };
-    db.addMatchRecord(userId, match);
+    db.addMatchRecord(userId, { ...match, roomId: (raw as any).roomId, abandoned });
+    AnalyticsService.track({
+      eventType: abandoned ? 'match_abandon' : 'match_end',
+      userId,
+      mode: raw.mode || statMode,
+      roomId: (raw as any).roomId,
+      durationSeconds: survivalSeconds,
+      score,
+      metadata: { kills, deaths, won, placement, statMode },
+    });
 
     const finalProfile = db.getProfile(userId)!;
     return {

@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
-export type GameMode = 'classic' | 'battle_royale' | 'team' | 'event';
+export type GameMode = 'classic' | 'battle_royale' | 'team' | 'event' | 'boss';
 export type GrowthStage = 'Baby' | 'Young' | 'Adult' | 'Elite' | 'Titan';
 
 export interface SnakeSegment { x: number; y: number; }
@@ -34,6 +34,7 @@ export interface SnakeData {
   superTimer?: number; // 🍄 super power (invincible + faster)
   abilityCooldown: number;
   abilityActiveTimer: number;
+  poisonTimer?: number;
   team?: 'red' | 'blue';
   isBoss?: boolean;
   equippedAccessory?: string;
@@ -77,6 +78,13 @@ export interface GameStateTick {
   npcs?: NpcData[];
   leaderboard: Array<{ id: string; name: string; score: number; kills: number; team?: 'red' | 'blue' }>;
   teamScores?: { red: number; blue: number };
+  teamZones?: Array<{ id: string; label: string; x: number; y: number; radius: number; owner: 'neutral' | 'red' | 'blue'; capturePct: number }>;
+  teamRelics?: Array<{ id: string; x: number; y: number; carrierId?: string; carrierTeam?: 'red' | 'blue'; points: number }>;
+  teamBases?: { red: { x: number; y: number }; blue: { x: number; y: number } };
+  teamObjectiveBreakdown?: {
+    red: { kills: number; zones: number; relics: number; resources: number };
+    blue: { kills: number; zones: number; relics: number; resources: number };
+  };
   currentEvent?: WorldEventData;
   matchTimer?: number;  // §2 Battle Royale — seconds remaining
   matchOver?: boolean;  // §2 match ended (timer/last-standing)
@@ -117,8 +125,9 @@ export function serverBase(): string {
   const meta = document.querySelector('meta[name="anaconda-server"]')?.getAttribute('content');
   if (meta && !meta.includes('your-backend.example.com')) return meta.replace(/\/$/, '');
 
-  // 4. Local dev — Vite on :3000/:5173 proxies to the backend on :4000.
-  if (location.port === '3000' || location.port === '5173') return `${location.protocol}//${location.hostname}:4000`;
+  // 4. Local dev — Vite on :3000..3009/:4173/:5173..5179 talks to backend on :4000.
+  const devPorts = ['3000', '3001', '3002', '3003', '3004', '3005', '3006', '3007', '3008', '3009', '4173', '5173', '5174', '5175', '5176', '5177', '5178', '5179'];
+  if (devPorts.includes(location.port)) return `${location.protocol}//${location.hostname}:4000`;
 
   // 5. capacitor:// or file:// origins can't reach a server → the offline local engine takes over.
   if (location.protocol === 'capacitor:' || location.protocol === 'file:') return '';
@@ -128,15 +137,14 @@ export function serverBase(): string {
   return location.origin;
 }
 
-// True when we have no reason to believe a backend exists at serverBase(). A static-only
-// host (the default Vercel deploy) serves the SPA but no API, so the app should go straight
-// to offline/local play rather than firing doomed requests on every screen.
+// True when we have reason to believe a backend exists at serverBase().
 export function hasConfiguredServer(): boolean {
   if (new URLSearchParams(location.search).get('server')) return true;
-  if ((import.meta as any).env?.VITE_SERVER_URL) return true;
+  if ((import.meta as any).env?.VITE_SERVER_URL || (import.meta as any).env?.VITE_API_URL) return true;
   const meta = document.querySelector('meta[name="anaconda-server"]')?.getAttribute('content');
   if (meta && !meta.includes('your-backend.example.com')) return true;
-  return location.port === '3000' || location.port === '5173';
+  const localPorts = ['3000', '3001', '3002', '3003', '3004', '3005', '3006', '3007', '3008', '3009', '4000', '4173', '5173', '5174', '5175', '5176', '5177', '5178', '5179'];
+  return localPorts.includes(location.port);
 }
 
 // §8 World size — single source of truth shared with the Renderer. Larger map = wide
@@ -154,32 +162,34 @@ const ZONE_FINAL_R = WORLD * 0.09;
 
 const FOOD_TYPES = [
   { type: 'cherry', val: 10, icon: '🍒', color: '#ff4d4d' },
-  { type: 'apple', val: 15, icon: '🍎', color: '#ff3333' },
-  { type: 'mushroom', val: 20, icon: '🍄', color: '#ff9933' },
-  { type: 'frog', val: 25, icon: '🐸', color: '#33cc33' },
+  { type: 'apple', val: 20, icon: '🫑', color: '#f59e0b' },
+  { type: 'mushroom', val: 20, icon: '🌻', color: '#ff9933' },
+  { type: 'frog', val: 25, icon: '💎', color: '#10b981' },
+  { type: 'crystal', val: 35, icon: '🔷', color: '#38bdf8' },
   // ⭐ stars are a dedicated moving set (§3), not part of the random food roll
-  { type: 'shield', val: 30, icon: '🛡️', color: '#3399ff' },
-  { type: 'speed', val: 30, icon: '⚡', color: '#ff66cc' },
+  { type: 'shield', val: 25, icon: '💚', color: '#3399ff' },
+  { type: 'speed', val: 25, icon: '⚡', color: '#facc15' },
 ];
 
 // §2/§3 obstacle palette for the local engine (mirrors the server table)
 const OBSTACLE_TYPES: Array<{ type: string; icon: string; radius: number; blocking: boolean; damage?: number; isPoison?: boolean }> = [
-  { type: 'tree', icon: '🌳', radius: 44, blocking: true, damage: 0 },
+  { type: 'tree', icon: '🌳', radius: 46, blocking: true, damage: 0 },
   { type: 'rock', icon: '🪨', radius: 34, blocking: true, damage: 0 },
-  { type: 'bush', icon: '🌲', radius: 32, blocking: true, damage: 0 },
-  { type: 'cactus', icon: '🌵', radius: 30, blocking: true, damage: 15 }, // 15% HP damage on contact
-  { type: 'flowerbed', icon: '🌼', radius: 28, blocking: false, damage: 0 },
-  { type: 'log', icon: '🪵', radius: 30, blocking: true, damage: 0 },
-  { type: 'pond', icon: '🪷', radius: 50, blocking: false, damage: 0 },
-  { type: 'hill', icon: '⛰️', radius: 46, blocking: true, damage: 0 },
-  { type: 'cave', icon: '🕳️', radius: 58, blocking: true, damage: 0 },
-  { type: 'lava', icon: '🔥', radius: 42, blocking: false, damage: 40 },  // 40% HP damage on contact
-  { type: 'poison', icon: '☠️', radius: 36, blocking: false, damage: 5, isPoison: true }, // 5% HP per sec DoT
-  { type: 'explosion', icon: '💥', radius: 40, blocking: false, damage: 50 }, // 50% HP damage on hit
+  { type: 'bush', icon: '🌿', radius: 34, blocking: false, damage: 0 },
+  { type: 'cactus', icon: '🏜️', radius: 38, blocking: true, damage: 15 }, // 15% HP damage on contact
+  { type: 'flowerbed', icon: '🌻', radius: 32, blocking: false, damage: 0 },
+  { type: 'log', icon: '🛢️', radius: 30, blocking: true, damage: 0 },
+  { type: 'pond', icon: '🏝️', radius: 54, blocking: false, damage: 0 },
+  { type: 'hill', icon: '🧊', radius: 48, blocking: true, damage: 0 },
+  { type: 'cave', icon: '⛏️', radius: 56, blocking: true, damage: 0 },
+  { type: 'signpost', icon: '🪧', radius: 28, blocking: false, damage: 0 },
+  { type: 'lava', icon: '🌋', radius: 44, blocking: false, damage: 35 },  // Volcano heat damage
+  { type: 'poison', icon: '☠️', radius: 38, blocking: false, damage: 6, isPoison: true }, // Cursed skull DoT
+  { type: 'explosion', icon: '💣', radius: 32, blocking: false, damage: 40 }, // Pirate bomb blast
 ];
 
 // §3 hp restored per food type (local engine health loop)
-const LOCAL_HEAL: Record<string, number> = { cherry: 5, apple: 8, mushroom: 4, frog: 3, egg: 25 };
+const LOCAL_HEAL: Record<string, number> = { cherry: 5, apple: 8, mushroom: 5, frog: 4, crystal: 6, shield: 10, egg: 25 };
 
 // §power Buff duration + stacking rules. Defaults mirror GameConfig.powers; when a server is
 // reachable, /api/config overwrites these so offline and online play stay on one curve.
@@ -214,9 +224,14 @@ export class GameClient {
   // §social Pending "come play" invites pushed by the server — on arrival, and again the
   // moment we authenticate (which is how invites sent while we were offline reach us).
   public onMatchInvite?: (r: { invites: MatchInviteData[] }) => void;
-  public onCollect?: (type: string, value: number) => void; // §V7 local-engine food/star pickup by the player
-  public onPickupEvent?: (r: { foodId: string; foodType: string; updatedMissions: any[]; profile: any }) => void; // §P1 server-authoritative pickup event
-  // §7 Matchmaking-chosen server URL for Global Adventure ('' = default origin from serverBase()).
+  public onCollect?: (type: string, value: number) => void;
+  public onPickupEvent?: (r: { foodId: string; foodType: string; updatedMissions: any[]; profile: any }) => void;
+  public onBossDefeat?: (r: any) => void;
+  public onWorldFeedback?: (ev: { x: number; y: number; text: string; color: string; shake?: number; boomRadius?: number }) => void;
+  public onNpcEncounter?: (encounter: any) => void;
+  public onQuestUpdate?: (update: any) => void;
+  public onAuthQuestSync?: (data: { activeQuest: any; activeQuiz: any; npcQuotas?: Record<string, any>; unclaimedRewardBoxCount?: number }) => void;
+  public onRoomMatchStarted?: (room: any) => void;
   public preferredServer = '';
 
   // Local Authoritative Simulation Engine (for serverless environments like Vercel Cloud)
@@ -241,19 +256,25 @@ export class GameClient {
   private localMatchTimer = 0;     // seconds remaining (BR / Team); 0 = untimed
   private localMatchOver = false;
   private localMatchLastTs = 0;    // wall clock of the last match tick → real dt, no drift
+  private localKingdom = 1;
 
   constructor() {
     this.localUserId = 'usr_' + Math.random().toString(36).substring(2, 9);
   }
 
-  public connect(token: string, skinName: string = 'Forest', mode: GameMode = 'classic', region = 'Global', matchType: 'local' | 'global' = 'global') {
+  public connect(
+    token: string,
+    skinName: string = 'Forest',
+    mode: GameMode = 'classic',
+    region = 'Global',
+    matchType: 'local' | 'global' = 'global',
+    extra?: { roomId?: string; roomCode?: string; kingdom?: number; withBots?: boolean }
+  ) {
+    this.localKingdom = Math.max(1, Math.min(7, extra?.kingdom || 1));
     // §2 Solo modes (Classic Snake / Nokia) never touch the multiplayer server.
     if (this.modeSolo) { this.startLocalEngine(skinName, mode, region); return; }
-    // No backend configured for this build (static-only deploy): go straight to the offline
-    // engine. Opening a socket at an origin with no game server just produced a reconnect
-    // storm of failed polling requests before the fallback fired anyway.
     if (!this.preferredServer && !hasConfiguredServer()) { this.startLocalEngine(skinName, mode, region); return; }
-    const authPayload = { token, skin: skinName, mode, region, matchType };
+    const authPayload = { token, skin: skinName, mode, region, matchType, ...extra };
     this.lastServerTickTime = 0;
 
     if (this.socket && this.socket.connected) {
@@ -282,10 +303,16 @@ export class GameClient {
         this.socket?.emit('authenticate', authPayload);
       });
 
-      this.socket.on('authenticated', (data: { userId: string; snake: SnakeData; config: ModeConfig }) => {
+      this.socket.on('authenticated', (data: { userId: string; snake: SnakeData; config: ModeConfig; activeQuest?: any; activeQuiz?: any; npcQuotas?: Record<string, any>; unclaimedRewardBoxCount?: number }) => {
         this.localUserId = data.userId || this.localUserId;
         this.modeConfig = data.config;
         this.onAuthSuccess?.(this.localUserId, data.snake, data.config);
+        this.onAuthQuestSync?.({
+          activeQuest: data.activeQuest || null,
+          activeQuiz: data.activeQuiz || null,
+          npcQuotas: data.npcQuotas,
+          unclaimedRewardBoxCount: data.unclaimedRewardBoxCount,
+        });
       });
 
       this.socket.on('game_state_tick', (tick: GameStateTick) => {
@@ -298,6 +325,11 @@ export class GameClient {
       this.socket.on('ability_result', (r: { used: boolean }) => this.onAbilityResult?.(r.used));
       this.socket.on('match_invite', (r: { invites: MatchInviteData[] }) => this.onMatchInvite?.(r)); // §social
       this.socket.on('pickup_event', (r: any) => this.onPickupEvent?.(r));
+      this.socket.on('boss_defeated', (r: any) => this.onBossDefeat?.(r));
+      this.socket.on('npc_encounter', (enc: any) => this.onNpcEncounter?.(enc));
+      this.socket.on('quest_update', (upd: any) => this.onQuestUpdate?.(upd));
+      this.socket.on('world_feedback', (ev: any) => this.onWorldFeedback?.(ev));
+      this.socket.on('room_match_started', (d: any) => this.onRoomMatchStarted?.(d?.room));
       this.socket.on('disconnect', () => { this.isConnected = false; });
     } catch { /* ignored */ }
 
@@ -376,12 +408,63 @@ export class GameClient {
     if (this.socket && this.isConnected) this.socket.emit(paused ? 'player_pause' : 'player_resume');
   }
 
+  public requestNpcInteract(npcId: string) {
+    if (this.isLocalEngineRunning) {
+      this.localPaused = true;
+      return;
+    }
+    if (this.socket && this.isConnected) {
+      this.socket.emit('npc_interact_request', { npcId });
+    }
+  }
+
+  public endInteraction() {
+    this.localPaused = false;
+    if (this.socket && this.isConnected) {
+      this.socket.emit('interaction_end');
+    }
+  }
+
+  /** Pause & protect the player while planning on the Tactical Arena Map (enemies cannot attack). */
+  public setMapPlanning(active: boolean) {
+    this.localPaused = active;
+    if (this.isLocalEngineRunning && this.localState && !active) {
+      const me = this.localState.snakes.find(s => s.id === this.localUserId);
+      if (me) me.shieldTimer = Math.max(me.shieldTimer || 0, 1.5);
+    }
+    if (this.socket && this.isConnected) {
+      this.socket.emit('map_planning', { active });
+    }
+  }
+
+  /** Apply a purchased power-up locally when in offline fallback engine. */
+  public applyLocalPowerup(powerupId: 'pw_boost' | 'pw_shield' | 'pw_super') {
+    if (!this.isLocalEngineRunning || !this.localState) return;
+    const me = this.localState.snakes.find(s => s.id === this.localUserId);
+    if (!me || !me.isAlive) return;
+    if (powerupId === 'pw_boost') {
+      me.speedBoostTimer = Math.max(me.speedBoostTimer || 0, 10);
+      this.onWorldFeedback?.({ x: me.head.x, y: me.head.y, text: 'SPEED BOOST +10s!', color: '#D97706' });
+    } else if (powerupId === 'pw_shield') {
+      me.shieldTimer = Math.max(me.shieldTimer || 0, 10);
+      this.onWorldFeedback?.({ x: me.head.x, y: me.head.y, text: 'GUARD SHIELD +10s!', color: '#0284C7' });
+    } else if (powerupId === 'pw_super') {
+      me.superTimer = Math.max(me.superTimer || 0, 8);
+      me.speedBoostTimer = Math.max(me.speedBoostTimer || 0, 8);
+      this.onWorldFeedback?.({ x: me.head.x, y: me.head.y, text: 'SUPER SURGE +8s!', color: '#DB2777' });
+    }
+  }
+
   public activateAbility() {
     if (this.isLocalEngineRunning && this.localState) {
       const me = this.localState.snakes.find(s => s.id === this.localUserId);
       if (me && me.abilityCooldown <= 0) {
-        me.abilityCooldown = 8;
-        me.speedBoostTimer = 3;
+        me.abilityCooldown = 12;
+        me.abilityActiveTimer = 3;
+        me.shieldTimer = Math.max(me.shieldTimer, 3);
+        me.speedBoostTimer = Math.max(me.speedBoostTimer, 2);
+        me.poisonTimer = 0;
+        this.onWorldFeedback?.({ x: me.head.x, y: me.head.y, text: 'GUARD +3s!', color: '#059669' });
         this.onAbilityResult?.(true);
       }
       return;
@@ -389,26 +472,25 @@ export class GameClient {
     if (this.socket && this.isConnected) this.socket.emit('activate_ability');
   }
 
-  public requestRespawn(method: 'stars' | 'ticket' | 'ad' | 'wait') {
+  public requestRespawn(method: 'stars' | 'ticket' | 'ad' | 'wait', adToken?: string) {
     if (this.isLocalEngineRunning && this.localState) {
       const me = this.localState.snakes.find(s => s.id === this.localUserId);
       if (me) {
         me.isAlive = true;
         me.hp = 100;
-        me.score = 150; me.level = 1; me.radius = 13; me.length = 9; // reset to a small snake
-        // §2 Respawn inside the CURRENT safe zone — by late game it is far smaller than the
-        // map centre spread, so a fixed ±200 box could drop the player straight into the storm.
+        me.poisonTimer = 0;
+        me.score = 150; me.level = 1; me.radius = 13; me.length = 9;
         const sz = this.localState.safeZone;
         const spawnR = Math.min(200, Math.max(0, sz.radius * 0.5));
         const ang = Math.random() * Math.PI * 2, d = Math.random() * spawnR;
         me.head = { x: this.wrapLocal(sz.centerX + Math.cos(ang) * d), y: this.wrapLocal(sz.centerY + Math.sin(ang) * d) };
         me.body = Array.from({ length: 9 }, (_, i) => ({ x: me.head.x - i * 10, y: me.head.y }));
-        (me as any).stormT = 0; // fresh storm grace after respawning
+        (me as any).stormT = 0;
         this.onRespawnResult?.({ success: true, method });
       }
       return;
     }
-    if (this.socket && this.isConnected) this.socket.emit('respawn', { method });
+    if (this.socket && this.isConnected) this.socket.emit('respawn', { method, adToken });
   }
 
   // ---------------------------------------------------------------- Local Simulation Engine
@@ -419,10 +501,8 @@ export class GameClient {
     this.localNokia = this.modeSolo || this.modeUI === 'nokia';
     this.localBR = mode === 'battle_royale';
     this.localTeam = mode === 'team';
-    // §2 BOTH timed modes get the round clock. Team Battle used to start at 0, which made
-    // elapsed == the full match on tick 1 — the zone snapped straight to its final radius and
-    // the match ended instantly.
-    this.localMatchTimer = (this.localBR || this.localTeam) ? MATCH_SECONDS : 0;
+    const isBossMode = mode === 'boss';
+    this.localMatchTimer = (this.localBR || this.localTeam || isBossMode) ? MATCH_SECONDS : 0;
     this.localMatchOver = false;
     this.localMatchLastTs = 0;
 
@@ -455,8 +535,17 @@ export class GameClient {
       team: this.localTeam ? 'blue' : undefined,
     };
 
-    // Nokia is solo (no bots); the bigger map (§8) is populated with up to ~24 rivals.
-    const botCount = this.localNokia ? 0 : (this.localBR ? 24 : 18);
+    const bossRoster = [
+      { id: 'boss_thornmaw', name: '🐲 Thornmaw', hp: 600, radius: 30, score: 4000 },
+      { id: 'boss_tidecoil', name: '🐉 Tidecoil', hp: 900, radius: 32, score: 5500 },
+      { id: 'boss_cinderfang', name: '🔥 Cinderfang', hp: 1200, radius: 34, score: 7500 },
+      { id: 'boss_frostscale', name: '❄️ Frostscale', hp: 1500, radius: 36, score: 9500 },
+      { id: 'boss_petalwyrm', name: '🌺 Petalwyrm', hp: 1850, radius: 38, score: 12000 },
+      { id: 'boss_duskshroud', name: '👁️ Duskshroud', hp: 2200, radius: 40, score: 15000 },
+      { id: 'boss_venom_emperor', name: '👑 Venom Emperor', hp: 3000, radius: 44, score: 20000 },
+    ];
+
+    const botCount = (this.localNokia || isBossMode) ? 0 : (this.localBR ? 24 : 18);
     const bots: SnakeData[] = Array.from({ length: botCount }, (_, idx) => {
       const name = BOT_NAMES[idx % BOT_NAMES.length] + (idx >= BOT_NAMES.length ? ` ${Math.floor(idx / BOT_NAMES.length) + 1}` : '');
       const bx = 400 + Math.random() * (WORLD - 800);
@@ -490,9 +579,41 @@ export class GameClient {
       };
     });
 
-    // §8 More food/stars/obstacles to fill the bigger map without feeling crowded.
-    const foodItems: FoodData[] = Array.from({ length: this.localNokia ? 70 : 260 }, (_, i) => this.genFood(`f_${i}`));
-    if (!this.localNokia) for (let i = 0; i < 24; i++) foodItems.push(this.genStar(`star_${i}`)); // §3 moving stars
+    if (isBossMode) {
+      const b = bossRoster[Math.min(bossRoster.length - 1, Math.max(0, this.localKingdom - 1))];
+      const bx = HALF + 520;
+      const by = HALF;
+      bots.push({
+        id: b.id,
+        userId: b.id,
+        displayName: b.name,
+        skin: 'Shadow',
+        head: { x: bx, y: by },
+        body: Array.from({ length: 34 }, (_, i) => ({ x: bx + i * 16, y: by })),
+        angle: Math.PI,
+        speed: 6.5,
+        speedPct: 75,
+        boosting: false,
+        score: b.score,
+        level: 50,
+        length: 34,
+        radius: b.radius,
+        hp: b.hp,
+        maxHp: b.hp,
+        defense: 40,
+        stage: 'Titan',
+        isAlive: true,
+        kills: 0,
+        shieldTimer: 0,
+        speedBoostTimer: 0,
+        abilityCooldown: 0,
+        abilityActiveTimer: 0,
+        isBoss: true,
+      });
+    }
+
+    const foodItems: FoodData[] = Array.from({ length: this.localNokia ? 65 : 260 }, (_, i) => this.genFood(`f_${i}`));
+    if (!this.localNokia) for (let i = 0; i < 24; i++) foodItems.push(this.genStar(`star_${i}`));
 
     this.localState = {
       tick: 1,
@@ -500,19 +621,25 @@ export class GameClient {
       mode,
       snakes: [me, ...bots],
       food: foodItems,
-      // Battle Royale AND Team Battle shrink toward the same small radius; other modes stay open.
       safeZone: {
         centerX: HALF,
         centerY: HALF,
-        radius: this.localBR || this.localTeam ? ZONE_START_R : HALF * 0.94,
-        targetRadius: this.localBR || this.localTeam ? ZONE_FINAL_R : HALF * 0.94,
+        radius: this.localBR || this.localTeam || isBossMode ? ZONE_START_R : HALF * 0.94,
+        targetRadius: this.localBR || this.localTeam || isBossMode ? ZONE_FINAL_R : HALF * 0.94,
         damagePerSecond: 15,
       },
-      sanctuaryZone: this.localNokia ? undefined : { centerX: HALF, centerY: HALF, radius: 360, label: '🛡️ Safe Sanctuary', icon: '🛡️' }, // §8
-      portals: this.localNokia ? [] : this.genWormholes(), // §7 four linked wormholes
-      obstacles: this.localNokia ? [] : this.genObstacles(30), // §2 (scaled to the bigger map)
+      sanctuaryZone: this.localNokia ? undefined : { centerX: HALF, centerY: HALF, radius: 360, label: '🛡️ Safe Sanctuary', icon: '🛡️' },
+      portals: this.localNokia ? [] : this.genWormholes(),
+      obstacles: this.localNokia ? [] : this.genObstacles(68),
+      npcs: (!this.localNokia && mode === 'classic') ? [
+        { id: 'npc_elder_moss', name: 'Elder Moss', role: 'elder', icon: '🐍', accessory: '🧙', kingdom: this.localKingdom, x: WORLD * 0.50, y: WORLD * 0.46, radius: 46 },
+        { id: 'npc_guard_bram', name: 'Guard Bram', role: 'guard', icon: '🐍', accessory: '🛡️', kingdom: this.localKingdom, x: WORLD * 0.58, y: WORLD * 0.52, radius: 46 },
+        { id: 'npc_merchant_fen', name: 'Fen the Trader', role: 'merchant', icon: '🐍', accessory: '🎒', kingdom: this.localKingdom, x: WORLD * 0.44, y: WORLD * 0.54, radius: 46 },
+        { id: 'npc_villager_pip', name: 'Pip', role: 'villager', icon: '🐍', accessory: '🌸', kingdom: this.localKingdom, x: WORLD * 0.53, y: WORLD * 0.41, radius: 46 },
+        { id: 'npc_trainer_kess', name: 'Kess the Coil', role: 'trainer', icon: '🐍', accessory: '⚔️', kingdom: this.localKingdom, x: WORLD * 0.47, y: WORLD * 0.58, radius: 46 },
+      ] : [],
       teamScores: this.localTeam ? { red: 0, blue: 0 } : undefined,
-      matchTimer: (this.localBR || this.localTeam) ? this.localMatchTimer : undefined,
+      matchTimer: (this.localBR || this.localTeam || isBossMode) ? this.localMatchTimer : undefined,
       leaderboard: [],
     };
 
@@ -541,15 +668,25 @@ export class GameClient {
 
   private genFood(id: string): FoodData {
     const fType = FOOD_TYPES[Math.floor(Math.random() * FOOD_TYPES.length)];
+    const min = this.localNokia ? HALF - 1050 : 100;
+    const span = this.localNokia ? 2100 : (WORLD - 200);
     return {
       id,
-      x: 100 + Math.random() * (WORLD - 200),
-      y: 100 + Math.random() * (WORLD - 200),
+      x: min + Math.random() * span,
+      y: min + Math.random() * span,
       value: fType.val,
       type: fType.type,
       color: fType.color,
       icon: fType.icon,
     };
+  }
+
+  private isInsideSanctuaryLocal(s: SnakeData): boolean {
+    const sz = this.localState?.sanctuaryZone;
+    if (!sz) return false;
+    const dx = this.wrapDeltaLocal(s.head.x - sz.centerX);
+    const dy = this.wrapDeltaLocal(s.head.y - sz.centerY);
+    return dx * dx + dy * dy < sz.radius * sz.radius;
   }
 
   // §6 Toroidal wrap helpers for the local engine (world = WORLD).
@@ -575,19 +712,29 @@ export class GameClient {
     return { id, x: 200 + Math.random() * (WORLD - 400), y: 200 + Math.random() * (WORLD - 400), value: 50, type: 'star', icon: '⭐', color: '#ffcc00', vx: 0, vy: 0, wanderTimer: Math.random() * 2 };
   }
 
-  // §2 Scatter obstacles with wide lanes and a clear centre spawn.
+  // §2 Scatter rich bundle obstacles with a discoverable starter ring (stone, pond, volcano, bomb, skull, tree, cave) + wide lanes
   private genObstacles(count: number): ObstacleData[] {
     const list: ObstacleData[] = [];
+    const ringTypes = ['rock', 'pond', 'lava', 'explosion', 'poison', 'tree', 'cave', 'flowerbed', 'bush', 'log'];
+    for (let i = 0; i < ringTypes.length; i++) {
+      const t = OBSTACLE_TYPES.find(o => o.type === ringTypes[i]) || OBSTACLE_TYPES[0];
+      const ang = (i / ringTypes.length) * Math.PI * 2 + 0.35;
+      const dist = 310 + (i % 2) * 190;
+      const x = Math.round(HALF + Math.cos(ang) * dist);
+      const y = Math.round(HALF + Math.sin(ang) * dist);
+      list.push({ id: `ob_ring_${i}`, type: t.type, icon: t.icon, x, y, radius: t.radius, blocking: t.blocking, damage: t.damage, isPoison: t.isPoison } as any);
+    }
+
     let guard = 0;
-    while (list.length < count && guard++ < 140) {
+    while (list.length < count && guard++ < 420) {
       const t = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
       const x = 240 + Math.random() * (WORLD - 480);
       const y = 240 + Math.random() * (WORLD - 480);
       const dcx = x - HALF, dcy = y - HALF;
-      if (dcx * dcx + dcy * dcy < 460 * 460) continue; // keep the centre spawn clear
+      if (dcx * dcx + dcy * dcy < 280 * 280) continue; // keep immediate spawn center free
       let ok = true;
-      for (const o of list) { const dx = x - o.x, dy = y - o.y, gap = t.radius + o.radius + 140; if (dx * dx + dy * dy < gap * gap) { ok = false; break; } }
-      if (ok) list.push({ id: `ob_${list.length}`, type: t.type, icon: t.icon, x, y, radius: t.radius, blocking: t.blocking, damage: t.damage });
+      for (const o of list) { const dx = x - o.x, dy = y - o.y, gap = t.radius + o.radius + 120; if (dx * dx + dy * dy < gap * gap) { ok = false; break; } }
+      if (ok) list.push({ id: `ob_${list.length}`, type: t.type, icon: t.icon, x, y, radius: t.radius, blocking: t.blocking, damage: t.damage, isPoison: t.isPoison } as any);
     }
     return list;
   }
@@ -598,36 +745,57 @@ export class GameClient {
     state.tick++;
     state.timestamp = Date.now();
 
-    // Tick down power timers for every snake (§power)
+    // Tick down power & poison timers for every snake (§power)
     for (const s of state.snakes) {
       if (s.shieldTimer > 0) s.shieldTimer = Math.max(0, s.shieldTimer - 0.033);
       if (s.speedBoostTimer > 0) s.speedBoostTimer = Math.max(0, s.speedBoostTimer - 0.033);
       if ((s.superTimer ?? 0) > 0) s.superTimer = Math.max(0, (s.superTimer ?? 0) - 0.033);
+      if (s.abilityActiveTimer > 0) s.abilityActiveTimer = Math.max(0, s.abilityActiveTimer - 0.033);
+      if ((s.poisonTimer ?? 0) > 0 && s.isAlive) {
+        s.poisonTimer = Math.max(0, (s.poisonTimer ?? 0) - 0.033);
+        if (s.shieldTimer > 0 || (s.superTimer ?? 0) > 0 || s.abilityActiveTimer > 0) {
+          s.poisonTimer = 0;
+        } else {
+          s.hp = Math.max(0, (s.hp ?? 100) - 6 * 0.033);
+          if (s.id === this.localUserId && state.tick % 24 === 0) {
+            this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: '-6 POISON', color: '#65A30D' });
+          }
+          if ((s.hp ?? 100) <= 0) this.eliminateLocal(s, null);
+        }
+      }
     }
 
     // 1. Update Player Snake Movement (frozen while the app is backgrounded — §12)
     const me = state.snakes.find(s => s.id === this.localUserId);
     if (me && me.isAlive && !this.localPaused) {
-      me.angle = this.localInput.angle;
+      if (this.localNokia) {
+        // Cardinal 90° snap steering with 180° instant-reverse protection
+        const q = Math.round(this.localInput.angle / (Math.PI / 2)) * (Math.PI / 2);
+        let diff = q - me.angle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        if (Math.abs(Math.abs(diff) - Math.PI) > 0.25) me.angle = q;
+      } else {
+        me.angle = this.localInput.angle;
+      }
       me.boosting = this.localInput.boosting && me.score > 20;
-      // Match the authoritative server feel (~240 u/s base, 1.7x boost) at 30 fps.
       let speed = me.boosting ? 13.6 : 8;
-      if ((me.speedBoostTimer ?? 0) > 0) speed *= 1.4; // ⚡ speed power
-      if ((me.superTimer ?? 0) > 0) speed *= 1.5;       // 🍄 super power
+      if ((me.speedBoostTimer ?? 0) > 0) speed *= 1.4;
+      if ((me.superTimer ?? 0) > 0) speed *= 1.5;
       if (me.boosting) me.score = Math.max(10, me.score - 0.2);
 
       const nx = me.head.x + Math.cos(me.angle) * speed;
       const ny = me.head.y + Math.sin(me.angle) * speed;
       if (this.localNokia) {
-        // §2 Classic Snake — walls kill, no wrap; hitting your own body is Game Over.
-        if (nx < me.radius || nx > WORLD - me.radius || ny < me.radius || ny > WORLD - me.radius) {
+        const minB = HALF - 1100 + me.radius;
+        const maxB = HALF + 1100 - me.radius;
+        if (nx < minB || nx > maxB || ny < minB || ny > maxB) {
           this.eliminateLocal(me, null);
         } else {
           me.head.x = nx; me.head.y = ny; this.followBodyLocal(me);
           if (this.selfCollide(me)) this.eliminateLocal(me, null);
         }
       } else {
-        // §6 wrap-around movement — no borders
         me.head.x = this.wrapLocal(nx);
         me.head.y = this.wrapLocal(ny);
         this.followBodyLocal(me);
@@ -635,15 +803,21 @@ export class GameClient {
       if (me.abilityCooldown > 0) me.abilityCooldown = Math.max(0, me.abilityCooldown - 0.033);
     }
 
-    // 2. Update Bot AI Movement — seek nearest food (toroidal), else wander
+    // 2. Update Bot / Boss AI Movement
     for (const b of state.snakes) {
       if (b.id === this.localUserId || !b.isAlive) continue;
       let tx = 0, ty = 0, best = 700 * 700, found = false;
-      for (const f of state.food) {
-        const dx = this.wrapDeltaLocal(f.x - b.head.x);
-        const dy = this.wrapDeltaLocal(f.y - b.head.y);
-        const d = dx * dx + dy * dy;
-        if (d < best) { best = d; tx = dx; ty = dy; found = true; }
+      if (b.isBoss && me && me.isAlive) {
+        tx = this.wrapDeltaLocal(me.head.x - b.head.x);
+        ty = this.wrapDeltaLocal(me.head.y - b.head.y);
+        found = true;
+      } else {
+        for (const f of state.food) {
+          const dx = this.wrapDeltaLocal(f.x - b.head.x);
+          const dy = this.wrapDeltaLocal(f.y - b.head.y);
+          const d = dx * dx + dy * dy;
+          if (d < best) { best = d; tx = dx; ty = dy; found = true; }
+        }
       }
       if (found) {
         const target = Math.atan2(ty, tx);
@@ -653,6 +827,20 @@ export class GameClient {
         b.angle += diff * 0.08;
       } else if (Math.random() < 0.04) {
         b.angle += (Math.random() - 0.5) * 1.2;
+      }
+      if (state.obstacles?.length) {
+        for (const ob of state.obstacles) {
+          if (!ob.blocking && !ob.damage) continue;
+          const dx = this.wrapDeltaLocal(ob.x - b.head.x), dy = this.wrapDeltaLocal(ob.y - b.head.y);
+          const av = ob.radius + b.radius + 70;
+          if (dx * dx + dy * dy < av * av) {
+            let diff = Math.atan2(-dy, -dx) - b.angle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            b.angle += diff * 0.25;
+            break;
+          }
+        }
       }
       const bSpeed = (b.speedBoostTimer ?? 0) > 0 ? 9 : 6.5; // a touch slower than the player
       b.head.x = this.wrapLocal(b.head.x + Math.cos(b.angle) * bSpeed);
@@ -686,7 +874,9 @@ export class GameClient {
           // the snake never fills the screen. Radius jumps at 500/1500/3000/5000/8000.
           s.radius = s.score >= 8000 ? 23 : s.score >= 5000 ? 21 : s.score >= 3000 ? 19 : s.score >= 1500 ? 17 : s.score >= 500 ? 15 : 13;
           s.stage = s.score >= 5000 ? 'Titan' : s.score >= 3000 ? 'Elite' : s.score >= 1500 ? 'Adult' : s.score >= 500 ? 'Young' : 'Baby';
-          s.length = s.score < 500 ? 9 : Math.min(40, 9 + Math.floor((s.score - 500) / 220));
+          s.length = this.localNokia
+            ? Math.min(80, 9 + Math.floor(Math.max(0, s.score - 150) / 25))
+            : (s.score < 500 ? 9 : Math.min(40, 9 + Math.floor((s.score - 500) / 220)));
           while (s.body.length < s.length) {
             const last = s.body[s.body.length - 1] || s.head;
             s.body.push({ x: last.x, y: last.y });
@@ -696,9 +886,18 @@ export class GameClient {
           // replacing it (2s left + a 5s power = 7s), capped so it can't become permanent.
           const dur = Math.min(POWERS.maxSeconds, POWERS.baseSeconds + Math.floor(s.level / POWERS.bonusPerLevels));
           const stack = (remaining: number) => Math.min(POWERS.maxStackedSeconds, Math.max(0, remaining) + dur);
-          if (f.type === 'shield') s.shieldTimer = stack(s.shieldTimer);
-          else if (f.type === 'speed') s.speedBoostTimer = stack(s.speedBoostTimer);
-          else if (f.type === 'mushroom') s.superTimer = stack(s.superTimer ?? 0);
+          if (f.type === 'shield') {
+            s.shieldTimer = stack(s.shieldTimer);
+            s.poisonTimer = 0;
+            if (s.id === this.localUserId) this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: `SHIELD +${dur}s`, color: '#0284C7' });
+          } else if (f.type === 'speed') {
+            s.speedBoostTimer = stack(s.speedBoostTimer);
+            if (s.id === this.localUserId) this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: `SPEED +${dur}s`, color: '#D97706' });
+          } else if (f.type === 'mushroom') {
+            s.superTimer = stack(s.superTimer ?? 0);
+            s.poisonTimer = 0;
+            if (s.id === this.localUserId) this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: `SUPER +${dur}s`, color: '#7C3AED' });
+          }
           if (s.id === this.localUserId) this.onCollect?.(f.type, f.value); // §V7 real-time mission/stat tracking
           state.food.splice(i, 1);
           state.food.push(this.genFood(`f_${Date.now()}_${i}`));
@@ -714,14 +913,15 @@ export class GameClient {
       for (let j = i + 1; j < state.snakes.length; j++) {
         const b = state.snakes[j];
         if (!b.isAlive) continue;
+        if (this.localTeam && a.team && a.team === b.team) continue; // no friendly fire
         if (this.localPaused && (a.id === this.localUserId || b.id === this.localUserId)) continue; // §12
         const dx = this.wrapDeltaLocal(a.head.x - b.head.x);
         const dy = this.wrapDeltaLocal(a.head.y - b.head.y);
         const clashDist = a.radius + b.radius;
         if (dx * dx + dy * dy >= clashDist * clashDist) continue; // heads not touching
 
-        const aSafe = a.shieldTimer > 0 || (a.superTimer ?? 0) > 0;
-        const bSafe = b.shieldTimer > 0 || (b.superTimer ?? 0) > 0;
+        const aSafe = a.shieldTimer > 0 || (a.superTimer ?? 0) > 0 || this.isInsideSanctuaryLocal(a);
+        const bSafe = b.shieldTimer > 0 || (b.superTimer ?? 0) > 0 || this.isInsideSanctuaryLocal(b);
         if (a.score > b.score) {
           if (!bSafe) this.eliminateLocal(b, a);
         } else if (b.score > a.score) {
@@ -734,21 +934,23 @@ export class GameClient {
       }
     }
 
-    // 3c. Respawn eliminated bots after a short delay so the world stays lively.
-    for (const s of state.snakes) {
-      if (s.isAlive || s.id === this.localUserId) continue;
-      s.respawnAt = s.respawnAt ?? state.timestamp + 4000;
-      if (state.timestamp >= s.respawnAt) {
-        const bx = 300 + Math.random() * (WORLD - 600);
-        const by = 300 + Math.random() * (WORLD - 600);
-        s.isAlive = true;
-        s.head = { x: bx, y: by };
-        s.body = Array.from({ length: 9 }, (_, i) => ({ x: bx - i * 10, y: by }));
-        s.score = Math.floor(100 + Math.random() * 400);
-        s.length = 9;
-        s.radius = 13;
-        s.shieldTimer = 1.5; // brief spawn protection
-        s.respawnAt = undefined;
+    // 3c. Respawn eliminated bots after a short delay (disabled in Battle Royale & 1v1 Boss).
+    if (!this.localBR && state.mode !== 'boss') {
+      for (const s of state.snakes) {
+        if (s.isAlive || s.id === this.localUserId || s.isBoss) continue;
+        s.respawnAt = s.respawnAt ?? state.timestamp + 4000;
+        if (state.timestamp >= s.respawnAt) {
+          const bx = 300 + Math.random() * (WORLD - 600);
+          const by = 300 + Math.random() * (WORLD - 600);
+          s.isAlive = true;
+          s.head = { x: bx, y: by };
+          s.body = Array.from({ length: 9 }, (_, i) => ({ x: bx - i * 10, y: by }));
+          s.score = Math.floor(100 + Math.random() * 400);
+          s.length = 9;
+          s.radius = 13;
+          s.shieldTimer = 1.5;
+          s.respawnAt = undefined;
+        }
       }
     }
 
@@ -856,30 +1058,101 @@ export class GameClient {
     }
   }
 
-  // §2 Blocking obstacles soft-push snake heads out; hazards deal event-driven damage.
+  // §2 Blocking obstacles soft-push snake heads out; bundle props trigger heal/boost/loot; hazards deal i-framed damage.
   private resolveLocalObstacles() {
     const obs = this.localState?.obstacles;
-    if (!obs?.length) return;
-    for (const s of this.localState!.snakes) {
+    if (!obs?.length || !this.localState) return;
+    const tick = this.localState.tick;
+    for (const s of this.localState.snakes) {
       if (!s.isAlive) continue;
       if (((s as any).hazardCd ?? 0) > 0) (s as any).hazardCd -= 0.033;
-      if ((s.superTimer ?? 0) > 0 || s.shieldTimer > 0) continue; // §3 invincible power ignores hazards
+      const isMe = s.id === this.localUserId;
+      const shielded = (s.superTimer ?? 0) > 0 || s.shieldTimer > 0 || s.abilityActiveTimer > 0;
       for (const ob of obs) {
-        const dx = s.head.x - ob.x, dy = s.head.y - ob.y;
+        const dx = this.wrapDeltaLocal(s.head.x - ob.x), dy = this.wrapDeltaLocal(s.head.y - ob.y);
         const minDist = ob.radius + s.radius, distSq = dx * dx + dy * dy;
+        const touchDist = ob.type === 'cave' || ob.type === 'tree' || ob.type === 'log' ? (minDist + 10) : minDist;
+        if (distSq >= touchDist * touchDist) continue;
+
+        if (ob.type === 'pond') {
+          if ((s.poisonTimer ?? 0) > 0) {
+            s.poisonTimer = 0;
+            if (isMe) this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: 'CLEANSED!', color: '#0284C7' });
+          }
+          if ((s.hp ?? 100) < (s.maxHp ?? 100)) {
+            s.hp = Math.min(s.maxHp ?? 100, (s.hp ?? 100) + 15 * 0.033);
+            if (isMe && tick % 25 === 0) this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: '+HP', color: '#10B981' });
+          }
+        } else if (ob.type === 'flowerbed') {
+          s.speedBoostTimer = Math.max(s.speedBoostTimer || 0, 0.5);
+          if ((s.hp ?? 100) < (s.maxHp ?? 100)) s.hp = Math.min(s.maxHp ?? 100, (s.hp ?? 100) + 5 * 0.033);
+        } else if (ob.type === 'bush' && (s.hp ?? 100) < (s.maxHp ?? 100)) {
+          s.hp = Math.min(s.maxHp ?? 100, (s.hp ?? 100) + 3.5 * 0.033);
+        } else if ((ob.type === 'tree' || ob.type === 'cave' || ob.type === 'log') && tick >= ((ob as any).interactCooldownUntil ?? 0)) {
+          (ob as any).interactCooldownUntil = tick + (ob.type === 'cave' ? 300 : 240);
+          const ang = Math.atan2(dy || 1, dx || 1);
+          const dropDist = ob.radius + 36;
+          const dropType = ob.type === 'cave' ? 'crystal' : (ob.type === 'log' ? 'super_star' : 'cherry');
+          this.localState.food.push({
+            id: `prop_${tick}_${Math.random().toString(36).slice(2, 6)}`,
+            x: this.wrapLocal(ob.x + Math.cos(ang) * dropDist),
+            y: this.wrapLocal(ob.y + Math.sin(ang) * dropDist),
+            value: ob.type === 'cave' ? 40 : (ob.type === 'log' ? 35 : 15),
+            type: dropType,
+            icon: ob.type === 'cave' ? '🔷' : '🍒',
+            color: ob.type === 'cave' ? '#38bdf8' : '#e63950',
+          });
+          if (isMe) {
+            this.onWorldFeedback?.({
+              x: ob.x, y: ob.y,
+              text: ob.type === 'cave' ? 'CRYSTAL!' : (ob.type === 'log' ? 'BONUS STAR!' : 'FRUIT DROP!'),
+              color: '#D97706',
+            });
+          }
+        }
+
         if (distSq >= minDist * minDist) continue;
         if (ob.blocking && distSq > 0.01) {
-          const dist = Math.sqrt(distSq), push = minDist - dist;
-          s.head.x += (dx / dist) * push; s.head.y += (dy / dist) * push;
+          const dist = Math.sqrt(distSq);
+          const nx = dx / dist, ny = dy / dist;
+          const push = minDist - dist;
+          s.head.x = this.wrapLocal(s.head.x + nx * push);
+          s.head.y = this.wrapLocal(s.head.y + ny * push);
+          const dot = Math.cos(s.angle) * nx + Math.sin(s.angle) * ny;
+          if (dot < -0.25) {
+            const cross = Math.cos(s.angle) * ny - Math.sin(s.angle) * nx;
+            s.angle += (cross >= 0 ? -0.18 : 0.18);
+          }
         }
         if (ob.damage) {
-          if ((ob as any).isPoison) {
-            // Poison: Damage over time (5% HP per second)
-            s.hp = Math.max(0, (s.hp ?? 100) - ob.damage * 0.033);
+          if (shielded) {
+            if (ob.type === 'explosion') {
+              s.score += 15;
+              if (isMe) this.onWorldFeedback?.({ x: ob.x, y: ob.y, text: 'DEFUSED +15', color: '#059669', boomRadius: ob.radius * 2 });
+              ob.x = 240 + Math.random() * (WORLD - 480);
+              ob.y = 240 + Math.random() * (WORLD - 480);
+            } else if (isMe && tick % 24 === 0) {
+              this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: 'BLOCKED!', color: '#0284C7' });
+            }
+            continue;
+          }
+          if ((ob as any).isPoison || ob.type === 'poison') {
+            if (((s as any).hazardCd ?? 0) <= 0) {
+              s.hp = Math.max(0, (s.hp ?? 100) - ob.damage);
+              s.poisonTimer = 3.5;
+              (s as any).hazardCd = 0.8;
+              if (isMe) this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: `-${ob.damage} POISON!`, color: '#65A30D', shake: 3 });
+            }
           } else if (((s as any).hazardCd ?? 0) <= 0) {
-            // Event-driven instant damage (Cactus 15%, Fire 40%, Explosion 50%) with 0.8s hit cooldown
             s.hp = Math.max(0, (s.hp ?? 100) - ob.damage);
             (s as any).hazardCd = 0.8;
+            if (ob.type === 'explosion') {
+              if (isMe) this.onWorldFeedback?.({ x: ob.x, y: ob.y, text: `-${ob.damage} BOOM!`, color: '#E11D48', shake: 8, boomRadius: ob.radius * 3 });
+              ob.x = 240 + Math.random() * (WORLD - 480);
+              ob.y = 240 + Math.random() * (WORLD - 480);
+            } else if (isMe) {
+              this.onWorldFeedback?.({ x: s.head.x, y: s.head.y, text: `-${ob.damage}`, color: ob.type === 'lava' ? '#EA580C' : '#E11D48', shake: 5 });
+            }
           }
           if ((s.hp ?? 100) <= 0) { this.eliminateLocal(s, null); break; }
         }
@@ -926,8 +1199,9 @@ export class GameClient {
   // §2 Battle Royale & Team Battle — timer, shrinking storm that eliminates snakes left outside, victory on timer / last standing / team wipe.
   private updateLocalMatch(_dt: number) {
     const state = this.localState;
-    const isCompetitive = this.localBR || this.localTeam;
-    if (!state || !isCompetitive || this.localMatchOver) return;
+    if (!state) return;
+    const isCompetitive = this.localBR || this.localTeam || state.mode === 'boss';
+    if (!isCompetitive || this.localMatchOver) return;
 
     // Real elapsed time, not the nominal 33 ms: a throttled/backgrounded tab would otherwise
     // let the HUD countdown drift away from the storm the player is actually standing in.
@@ -994,8 +1268,12 @@ export class GameClient {
     if (winner) {
       winner.kills++;
       winner.score += 200 + Math.floor(loser.score * 0.25);
-      // §2 Team Battle scoring
       if (this.localTeam && winner.team && this.localState?.teamScores) this.localState.teamScores[winner.team]++;
+      if (loser.isBoss && this.localState && this.localState.mode === 'boss') {
+        this.localMatchOver = true;
+        this.localState.matchOver = true;
+        this.onBossDefeat?.({ bossId: loser.id, kingdom: this.localKingdom, local: true });
+      }
     }
     if (!this.localState) return;
     const food = this.localState.food;

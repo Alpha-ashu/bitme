@@ -1,65 +1,81 @@
-/**
- * Food & Collectible Asset Registry
- */
+// Uploaded Bundle Collectibles & Rewards Sprite Renderer (no drawn non-bundle props)
+
+import { BundleSpriteKey, drawSpriteCentered } from './spriteCache.js';
 
 export function renderFrogAsset(ctx: CanvasRenderingContext2D, fx: number, fy0: number, animFrame: number) {
-  const size = 18;
-  const time = (animFrame * 0.045 + (fx * 0.13)) % 2.6;
-  let jumpY = 0;
-  let leapPhase = 0;
+  const pulse = 1 + Math.sin(animFrame * 0.1 + fx) * 0.07;
+  drawSpriteCentered(ctx, 'gem_emerald_diamond', fx, fy0, 34 * pulse, {
+    shadow: true,
+    auraColor: 'rgba(16, 185, 129, 0.2)',
+  });
+}
 
-  if (time > 1.3 && time < 2.0) {
-    const leapProgress = (time - 1.3) / 0.7;
-    jumpY = Math.sin(leapProgress * Math.PI) * 40;
-    leapPhase = Math.sin(leapProgress * Math.PI);
-  } else if (time >= 2.0 && time < 2.2) {
-    leapPhase = -0.15;
-  }
+export function renderCherryVector(ctx: CanvasRenderingContext2D, x: number, y: number, r = 14) {
+  drawSpriteCentered(ctx, 'farm_cherry_twin', x, y, r * 2.25, { shadow: true });
+}
 
-  const py = fy0 - jumpY;
+export function renderAppleVector(ctx: CanvasRenderingContext2D, x: number, y: number, r = 15) {
+  drawSpriteCentered(ctx, 'farm_golden_pepper', x, y, r * 2.25, { shadow: true });
+}
 
-  ctx.save();
-  ctx.translate(fx, py);
+export function renderMushroomVector(ctx: CanvasRenderingContext2D, x: number, y: number, animFrame: number, r = 17) {
+  const pulse = 1 + Math.sin(animFrame * 0.12 + x) * 0.08;
+  drawSpriteCentered(ctx, 'farm_sunflower', x, y, r * 2.35 * pulse, {
+    shadow: true,
+    auraColor: 'rgba(250, 204, 21, 0.25)',
+  });
+}
 
-  ctx.fillStyle = '#689F38';
-  ctx.beginPath();
-  ctx.ellipse(-size * 0.85, size * (0.28 + leapPhase * 0.2), size * 0.52, size * (0.3 + leapPhase * 0.15), -0.3 - leapPhase * 0.4, 0, Math.PI * 2);
-  ctx.ellipse(size * 0.85, size * (0.28 + leapPhase * 0.2), size * 0.52, size * (0.3 + leapPhase * 0.15), 0.3 + leapPhase * 0.4, 0, Math.PI * 2);
-  ctx.fill();
+export function renderStarCoinVector(ctx: CanvasRenderingContext2D, x: number, y: number, animFrame: number, r = 16) {
+  const pulse = 1 + Math.sin(animFrame * 0.12 + x) * 0.08;
+  const key: BundleSpriteKey = r >= 18 ? 'gem_violet_star' : 'ui_star_wood';
+  drawSpriteCentered(ctx, key, x, y, r * 2.4 * pulse, {
+    shadow: true,
+    auraColor: r >= 18 ? 'rgba(168, 85, 247, 0.28)' : 'rgba(250, 204, 21, 0.28)',
+  });
+}
 
-  ctx.fillStyle = '#7CB342';
-  ctx.beginPath();
-  ctx.ellipse(0, size * 0.08, size * 0.82, size * (0.7 + leapPhase * 0.15), 0, 0, Math.PI * 2);
-  ctx.fill();
+export function renderEggVector(ctx: CanvasRenderingContext2D, x: number, y: number, animFrame: number, r = 16) {
+  const pulse = 1 + Math.sin(animFrame * 0.1) * 0.06;
+  drawSpriteCentered(ctx, 'crystal_rainbow', x, y, r * 2.6 * pulse, {
+    shadow: true,
+    auraColor: 'rgba(56, 189, 248, 0.24)',
+  });
+}
 
-  ctx.fillStyle = '#DCEDC8';
-  ctx.beginPath();
-  ctx.ellipse(0, size * 0.26, size * 0.56, size * 0.4, 0, 0, Math.PI * 2);
-  ctx.fill();
+export function renderTreasureChestVector(ctx: CanvasRenderingContext2D, x: number, y: number, animFrame: number, r = 19) {
+  const pulse = 1 + Math.sin(animFrame * 0.1) * 0.05;
+  drawSpriteCentered(ctx, 'pirate_chest', x, y, r * 2.45 * pulse, {
+    shadow: true,
+    auraColor: 'rgba(245, 158, 11, 0.24)',
+  });
+}
 
-  ctx.fillStyle = '#7CB342';
-  ctx.beginPath();
-  ctx.arc(-size * 0.46, -size * (0.42 + leapPhase * 0.1), size * 0.4, 0, Math.PI * 2);
-  ctx.arc(size * 0.46, -size * (0.42 + leapPhase * 0.1), size * 0.4, 0, Math.PI * 2);
-  ctx.fill();
+export function renderPotionVector(ctx: CanvasRenderingContext2D, x: number, y: number, r = 14) {
+  drawSpriteCentered(ctx, 'pirate_potion', x, y, r * 2.35, { shadow: true });
+}
 
-  ctx.fillStyle = '#212121';
-  ctx.beginPath();
-  ctx.arc(-size * 0.46, -size * (0.42 + leapPhase * 0.1), size * 0.3, 0, Math.PI * 2);
-  ctx.arc(size * 0.46, -size * (0.42 + leapPhase * 0.1), size * 0.3, 0, Math.PI * 2);
-  ctx.fill();
+export function renderCrystalVector(ctx: CanvasRenderingContext2D, x: number, y: number, animFrame: number, r = 16) {
+  const keys: BundleSpriteKey[] = ['gem_cyan_rect', 'gem_pink_hex', 'gem_ruby_square', 'crystal_green', 'gem_ice_hex'];
+  const key = keys[Math.abs(Math.round(x + y)) % keys.length];
+  const pulse = 1 + Math.sin(animFrame * 0.11 + y) * 0.06;
+  drawSpriteCentered(ctx, key, x, y, r * 2.3 * pulse, {
+    shadow: true,
+    auraColor: 'rgba(56, 189, 248, 0.22)',
+  });
+}
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(-size * 0.54, -size * (0.5 + leapPhase * 0.1), size * 0.11, 0, Math.PI * 2);
-  ctx.arc(size * 0.38, -size * (0.5 + leapPhase * 0.1), size * 0.11, 0, Math.PI * 2);
-  ctx.fill();
+export function renderGlowOrbVector(ctx: CanvasRenderingContext2D, x: number, y: number, _color: string, animFrame: number, r = 11) {
+  const keys: BundleSpriteKey[] = ['gem_gold_sun', 'gem_blue_heart', 'gem_amber_square', 'gem_green_oval'];
+  const key = keys[Math.abs(Math.round(x * 3 + y)) % keys.length];
+  const pulse = 1 + Math.sin(animFrame * 0.14 + x) * 0.08;
+  drawSpriteCentered(ctx, key, x, y, r * 2.2 * pulse, {
+    auraColor: 'rgba(250, 204, 21, 0.22)',
+  });
+}
 
-  ctx.strokeStyle = '#33691E';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.arc(0, -size * 0.04, size * 0.42, 0.2, Math.PI - 0.2);
-  ctx.stroke();
-
-  ctx.restore();
+export function renderCritterVector(ctx: CanvasRenderingContext2D, x: number, y: number, kind: 'mouse' | 'lizard', animFrame: number, r = 15) {
+  const key: BundleSpriteKey = kind === 'mouse' ? 'pirate_gold_coins' : 'gem_amber_square';
+  const bob = Math.sin(animFrame * 0.15 + x) * 2;
+  drawSpriteCentered(ctx, key, x, y + bob, r * 2.3, { shadow: true });
 }

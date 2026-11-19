@@ -7,13 +7,16 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "test": "node --test test/services.test.js test/session.test.js test/stress.test.js"
+    "create-admin": "node dist/scripts/createAdmin.js",
+    "test": "node --test test/services.test.js test/session.test.js test/stress.test.js test/admin_analytics_ads.test.js test/rpg_campaign.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.5.0",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {
@@ -21,6 +24,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.6",
+    "@types/multer": "^2.3.0",
     "@types/node": "^20.12.7",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5"

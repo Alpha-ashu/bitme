@@ -50,6 +50,7 @@ export interface GameConfig {
     zoneStartPct: number;            // opening radius as a fraction of world size
     zoneFinalPct: number;            // fully-closed radius as a fraction of world size
     zoneCloseAtPct: number;          // point in the round (0-1) where the zone reaches final size
+    bossDurationSeconds: number;     // §boss length of a 1v1 arena fight
   };
   maps: {
     // Add a new playable theme by appending an entry here (or in game-config.json) — no code change.
@@ -64,6 +65,8 @@ export interface GameConfig {
     skins: SkinDef[];
     // Granted to every new account (and back-filled onto pre-ownership profiles).
     starterSkins: string[];
+    accessories: AccessoryDef[];
+    starterAccessories: string[];
   };
   // Live-ops calendar. Scheduled events are pure data — add one here (or in game-config.json)
   // and it appears in the client's Events page with no code change.
@@ -87,6 +90,18 @@ export interface SkinDef {
   name: string;
   family: string;
   rarity: 'starter' | 'common' | 'rare' | 'epic' | 'legendary';
+  costStars: number;
+  costTickets: number;
+  minLevel: number;
+}
+
+export interface AccessoryDef {
+  id: string;
+  name: string;
+  icon: string;
+  slot: 'hat' | 'neck' | 'back';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  seasonal?: boolean;
   costStars: number;
   costTickets: number;
   minLevel: number;
@@ -190,6 +205,7 @@ const DEFAULTS: GameConfig = {
     zoneStartPct: 0.47,
     zoneFinalPct: 0.09,
     zoneCloseAtPct: 0.9,
+    bossDurationSeconds: 150,
   },
   maps: {
     themes: [
@@ -234,6 +250,20 @@ const DEFAULTS: GameConfig = {
       { id: 'Golden',    name: 'Golden',    family: 'Elegant',  rarity: 'legendary', costStars: 3500, costTickets: 5, minLevel: 20 },
       { id: 'Royal',     name: 'Royal',     family: 'Elegant',  rarity: 'legendary', costStars: 3500, costTickets: 5, minLevel: 20 },
       { id: 'Mythical',  name: 'Mythical',  family: 'Mystical', rarity: 'legendary', costStars: 5000, costTickets: 8, minLevel: 25 },
+    ],
+    starterAccessories: ['flower_crown'],
+    accessories: [
+      { id: 'flower_crown',    name: 'Flower Crown',     icon: '🌸', slot: 'hat',  rarity: 'common',    costStars: 0,    costTickets: 0, minLevel: 1 },
+      { id: 'explorer_hat',    name: 'Explorer Hat',     icon: '🤠', slot: 'hat',  rarity: 'common',    costStars: 250,  costTickets: 0, minLevel: 1 },
+      { id: 'headphones',      name: 'Headphones',       icon: '🎧', slot: 'hat',  rarity: 'common',    costStars: 300,  costTickets: 0, minLevel: 2 },
+      { id: 'scarf',           name: 'Scarf',            icon: '🧣', slot: 'neck', rarity: 'common',    costStars: 350,  costTickets: 0, minLevel: 3 },
+      { id: 'pirate_hat',      name: 'Pirate Hat',       icon: '🏴‍☠️', slot: 'hat',  rarity: 'rare',      costStars: 700,  costTickets: 0, minLevel: 5 },
+      { id: 'wizard_hat',      name: 'Wizard Hat',       icon: '🎩', slot: 'hat',  rarity: 'rare',      costStars: 800,  costTickets: 0, minLevel: 7 },
+      { id: 'backpack',        name: 'Tiny Backpack',    icon: '🎒', slot: 'back', rarity: 'rare',      costStars: 900,  costTickets: 0, minLevel: 8 },
+      { id: 'christmas_hat',   name: 'Christmas Hat',    icon: '🎅', slot: 'hat',  rarity: 'rare',      seasonal: true, costStars: 1200, costTickets: 1, minLevel: 10 },
+      { id: 'ramadan_lantern', name: 'Ramadan Lantern',  icon: '🏮', slot: 'hat',  rarity: 'epic',      seasonal: true, costStars: 1600, costTickets: 1, minLevel: 12 },
+      { id: 'diwali_crown',    name: 'Diwali Crown',     icon: '👑', slot: 'hat',  rarity: 'epic',      seasonal: true, costStars: 1600, costTickets: 1, minLevel: 12 },
+      { id: 'golden_wings',    name: 'Golden Wings',     icon: '✨', slot: 'back', rarity: 'legendary', costStars: 3200, costTickets: 4, minLevel: 20 },
     ],
   },
   // §milestone The journey, told in checkpoints. Explorer carries the full Lost Crown arc;
@@ -316,6 +346,10 @@ export function skinById(id: string): SkinDef | undefined {
   return gameConfig.cosmetics.skins.find(s => s.id === id);
 }
 
+export function accessoryById(id: string): AccessoryDef | undefined {
+  return gameConfig.cosmetics.accessories.find(a => a.id === id);
+}
+
 // A scheduled event is "live" inside its explicit ISO window, or during one of its months.
 export function eventIsLive(e: ScheduledEvent, now: Date = new Date()): boolean {
   if (e.startsAt || e.endsAt) {
@@ -332,6 +366,8 @@ export function clientConfig() {
   return {
     progression: {
       maxLevel: gameConfig.progression.maxLevel,
+      xpBase: gameConfig.progression.xpBase,
+      xpPerLevel: gameConfig.progression.xpPerLevel,
       evolutionLadder: gameConfig.progression.evolutionLadder,
     },
     // `respawn` is published so the RESPAWN OPTIONS panel prices itself from the same source
@@ -341,7 +377,12 @@ export function clientConfig() {
     maps: { themes: gameConfig.maps.themes, seasons: gameConfig.maps.seasons, activeSeason: activeSeasonId() },
     // Skin pricing is published so the shop UI renders one source of truth — but ownership
     // and the actual charge are always decided server-side.
-    cosmetics: { skins: gameConfig.cosmetics.skins, starterSkins: gameConfig.cosmetics.starterSkins },
+    cosmetics: {
+      skins: gameConfig.cosmetics.skins,
+      starterSkins: gameConfig.cosmetics.starterSkins,
+      accessories: gameConfig.cosmetics.accessories,
+      starterAccessories: gameConfig.cosmetics.starterAccessories,
+    },
     // §power Published so the offline engine grants and stacks buffs on the same curve.
     powers: gameConfig.powers,
     // §milestone Published so offline play can still show the journey and celebrate beats.

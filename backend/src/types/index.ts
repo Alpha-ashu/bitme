@@ -1,10 +1,17 @@
+export type UserRole = 'player' | 'admin' | 'super_admin';
+export type UserStatus = 'active' | 'disabled' | 'banned';
+
 export interface UserAccount {
   id: string;
   username: string;
   email: string;
   passwordHash?: string;
+  role: UserRole;
+  status: UserStatus;
   isGuest: boolean;
   createdAt: string;
+  lastLoginAt?: string;
+  lastActiveAt?: string;
   mfaEnabled?: boolean;
 }
 
@@ -29,6 +36,9 @@ export interface Accessory {
   slot: AccessorySlot;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   seasonal?: boolean;
+  costStars?: number;
+  costTickets?: number;
+  minLevel?: number;
 }
 
 export interface PlayerProfile {
@@ -79,6 +89,8 @@ export interface PlayerProfile {
   };
   inventory?: Record<string, number>; // §V7 owned consumable/collectible items (eggs, event items) → count
   lastDailyBonus?: string;       // §V7 YYYY-MM-DD of the last daily-all-complete bonus (once/day gate)
+  dailyStreak?: number;
+  lastStreakDate?: string;
 }
 
 // §V7 Centralized permanent statistics. Win rate and K/D are DERIVED on read (never stored),
@@ -198,7 +210,7 @@ export interface SnakeSegment {
   y: number;
 }
 
-export type GameMode = 'classic' | 'battle_royale' | 'team' | 'event';
+export type GameMode = 'classic' | 'battle_royale' | 'team' | 'event' | 'boss';
 
 export type GrowthStage = 'Baby' | 'Young' | 'Teen' | 'Adult' | 'Elite' | 'Titan';
 
@@ -234,13 +246,20 @@ export interface SnakeState {
   superTimer?: number;       // 🍄 super power (invincible + faster) remaining
   abilityCooldown: number;   // time until ability can be used again
   abilityActiveTimer: number;// ability effect remaining
+  poisonTimer?: number;      // lingering toxic skull curse remaining (seconds)
   activeBuff?: string;
   team?: 'red' | 'blue';
   distanceTravelled: number; // metres (world units / 100)
   isBot?: boolean;
   isBoss?: boolean;
-  isPaused?: boolean;        // §12 backgrounded player — frozen, invisible, takes no damage
+  isPaused?: boolean;        // §12 backgrounded player — solo/adventure only (never PvP immunity)
+  inInteraction?: boolean;   // safe NPC/quiz interaction freeze in solo/adventure modes
+  isMapPlanning?: boolean;   // safe tactical map planning pause (no enemy attacks while planning)
+  mapPlanningStartedAt?: number;
+  teamContribution?: number; // Team Battle Royale objective contribution score
+  carryingRelicId?: string;  // Team Battle Royale relic currently carried
   lastHitTick?: number;      // tick timestamp of last obstacle collision hit
+  lastObjectTick?: number;   // tick timestamp of last interactive prop reward
 }
 
 export type CollectibleType =
@@ -279,7 +298,7 @@ export interface FoodItem {
 }
 
 // §2 Dynamic obstacles — decorative + soft-collision props that never fully block the map
-export type ObstacleType = 'tree' | 'rock' | 'bush' | 'cactus' | 'flowerbed' | 'log' | 'pond' | 'hill' | 'lava' | 'poison';
+export type ObstacleType = 'tree' | 'rock' | 'bush' | 'cactus' | 'flowerbed' | 'log' | 'pond' | 'hill' | 'lava' | 'poison' | 'cave' | 'signpost' | 'explosion';
 
 export interface Obstacle {
   id: string;
@@ -288,8 +307,10 @@ export interface Obstacle {
   y: number;
   radius: number;
   icon: string;
-  blocking: boolean; // true = soft-pushes snakes out (rock/tree/hill); false = purely cosmetic
-  damage?: number;   // §3 hazard damage per second dealt on contact (cactus/lava/poison)
+  blocking: boolean; // true = soft-pushes snakes out (rock/tree/hill/cave); false = passable zone or trigger
+  damage?: number;   // §3 hazard damage dealt on contact (cactus/lava/poison/explosion)
+  variant?: number;  // deterministic visual sprite index within asset bundle
+  interactCooldownUntil?: number; // tick until interactive prop can spawn/grant again
 }
 
 export interface SafeZone {
@@ -381,7 +402,7 @@ export interface MatchInvite {
 // simulation emits, so a NEW collectible only has to be added in one place to start counting
 // toward missions, achievements and lifetime stats.
 export type ProgressMetric =
-  | 'cherry' | 'apple' | 'frog' | 'star' | 'egg' | 'kill' | 'treasure'
+  | 'cherry' | 'apple' | 'frog' | 'star' | 'crystal' | 'egg' | 'kill' | 'treasure'
   | 'heal' | 'shield' | 'boost' | 'win'
   | 'mushroom' | 'speed' | 'powerup' | 'magnet' | 'fire' | 'gift'
   | 'assist' | 'death'
@@ -461,6 +482,13 @@ export interface GameWorldState {
   food: Record<string, FoodItem>;
   leaderboard: Array<{ id: string; name: string; score: number; kills: number; team?: 'red' | 'blue' }>;
   teamScores?: { red: number; blue: number };
+  teamZones?: TeamControlZone[];
+  teamRelics?: TeamRelic[];
+  teamBases?: { red: Vector2D; blue: Vector2D };
+  teamObjectiveBreakdown?: {
+    red: { kills: number; zones: number; relics: number; resources: number };
+    blue: { kills: number; zones: number; relics: number; resources: number };
+  };
   currentEvent?: WorldEvent;
   // §2 Competitive round clock — the same clock that drives the shrinking zone, so the HUD
   // countdown always matches the storm the player can see.
@@ -500,6 +528,7 @@ export interface MissionObjective {
   rewardEvoXP: number;
   isCompleted: boolean;
   isClaimed: boolean;
+  periodKey?: string;
 }
 
 export interface AdminTelemetry {
@@ -522,4 +551,343 @@ export interface GameEventNotification {
   type: 'kill' | 'boss_spawn' | 'event_start' | 'coupon_found';
   message: string;
   timestamp: number;
+}
+
+export interface AuthSession {
+  id: string;
+  userId: string;
+  role: UserRole;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+  ip?: string;
+  userAgent?: string;
+}
+
+export type AdPlacement =
+  | 'home_screen'
+  | 'between_sessions'
+  | 'game_over'
+  | 'story_menu'
+  | 'rewarded_opt_in';
+
+export interface Advertisement {
+  id: string;
+  title: string;
+  description: string;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  destinationUrl: string;
+  placement: AdPlacement;
+  enabled: boolean;
+  startsAt: string;
+  endsAt: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  impressions?: number;
+  clicks?: number;
+  ctr?: number;
+}
+
+export interface AdEventRecord {
+  id: string;
+  adId: string;
+  userId?: string;
+  placement: AdPlacement;
+  eventType: 'impression' | 'click';
+  createdAt: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  adminId: string;
+  adminUsername?: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  details?: Record<string, any>;
+  ip?: string;
+  createdAt: string;
+}
+
+export type AnalyticsEventType =
+  | 'user_register'
+  | 'user_login'
+  | 'user_logout'
+  | 'user_upgrade'
+  | 'session_start'
+  | 'session_end'
+  | 'mode_select'
+  | 'match_start'
+  | 'match_end'
+  | 'match_complete'
+  | 'match_abandon'
+  | 'story_quest_complete'
+  | 'story_boss_defeat'
+  | 'ad_impression'
+  | 'ad_click'
+  | 'adventure_level_start'
+  | 'adventure_level_complete'
+  | 'adventure_level_fail'
+  | 'adventure_level_abandon'
+  | 'npc_encounter'
+  | 'quest_offer'
+  | 'quest_accept'
+  | 'quest_later'
+  | 'quest_skip'
+  | 'quest_complete'
+  | 'quest_fail'
+  | 'quest_abandon'
+  | 'quest_claim'
+  | 'quiz_start'
+  | 'quiz_answer'
+  | 'quiz_complete'
+  | 'boss_attempt'
+  | 'boss_victory'
+  | 'boss_fail'
+  | 'boss_milestone_abandon'
+  | 'team_zone_capture'
+  | 'team_relic_deliver'
+  | 'private_room_create'
+  | 'private_room_invite'
+  | 'private_room_join';
+
+export interface AnalyticsEventInput {
+  eventType: AnalyticsEventType;
+  userId?: string;
+  sessionId?: string;
+  mode?: string;
+  roomId?: string;
+  durationSeconds?: number;
+  score?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface LobbyRoomMember {
+  userId: string;
+  displayName: string;
+  ready: boolean;
+  team?: 'red' | 'blue';
+  isHost?: boolean;
+}
+
+export interface LobbyRoomInfo {
+  roomId: string;
+  roomCode?: string;
+  mode: GameMode;
+  region: string;
+  playerCount: number;
+  humanCount?: number;
+  botCount?: number;
+  maxPlayers: number;
+  status: 'lobby' | 'open' | 'intermission';
+  stageStatus?: 'lobby' | 'open';
+  matchTimer?: number;
+  matchOver?: boolean;
+  hostUserId?: string;
+  hostName?: string;
+  isPrivate?: boolean;
+  isCustom?: boolean;
+  mapTheme?: string;
+  durationSeconds?: number;
+  aiBackfill?: boolean;
+  members?: LobbyRoomMember[];
+  createdAt?: string;
+  players?: Array<{ id: string; displayName: string; team?: 'red' | 'blue'; score: number; contribution?: number }>;
+}
+
+// ── Adventure RPG, 1,000-Level Campaign, Quest State Machine & Quiz Types ──
+
+export type QuestState =
+  | 'AVAILABLE'
+  | 'APPROACHABLE'
+  | 'OFFERED'
+  | 'ACCEPTED'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CLAIMABLE'
+  | 'CLAIMED'
+  | 'SKIPPED'
+  | 'ABANDONED'
+  | 'FAILED';
+
+export type LevelType =
+  | 'exploration'
+  | 'collection'
+  | 'survival'
+  | 'navigation'
+  | 'word_puzzle'
+  | 'math'
+  | 'memory'
+  | 'logic'
+  | 'rescue'
+  | 'boss_challenge'
+  | 'multi_stage'
+  | 'secret';
+
+export type QuizCategory = 'word' | 'math' | 'memory' | 'logic';
+
+export interface TeamControlZone {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  radius: number;
+  owner: 'neutral' | 'red' | 'blue';
+  capturePct: number; // -100 (red) to +100 (blue)
+}
+
+export interface TeamRelic {
+  id: string;
+  x: number;
+  y: number;
+  carrierId?: string;
+  carrierTeam?: 'red' | 'blue';
+  points: number;
+}
+
+export interface QuestRewardBundle {
+  stars: number;
+  xp: number;
+  evoXp: number;
+  tickets?: number;
+  badge?: string;
+  unlockItem?: string;
+}
+
+export interface QuestStageSpec {
+  index: number;
+  kind: 'collect' | 'navigate' | 'survive' | 'quiz' | 'rescue' | 'switches' | 'boss_objective' | 'kill';
+  label: string;
+  metric?: string;
+  category?: QuizCategory;
+  target: number;
+  timeLimitSec?: number;
+  waypoints?: Array<{ id: string; label: string; x: number; y: number; radius: number }>;
+  switches?: Array<{ id: string; label: string; x: number; y: number; radius: number }>;
+  rescueNpcId?: string;
+  untimed?: boolean;
+}
+
+export interface CampaignLevelDef {
+  levelId: string;
+  levelNumber: number;
+  worldNumber: number;
+  worldId: string;
+  worldName: string;
+  theme: string;
+  title: string;
+  description: string;
+  levelType: LevelType;
+  difficultyTier: 1 | 2 | 3 | 4 | 5;
+  expectedDurationSec: number;
+  isBossCheckpoint: boolean;
+  isMajorMilestone: boolean;
+  bossId?: string;
+  bossName?: string;
+  bossArchetype?: string;
+  npcId?: string;
+  npcName?: string;
+  stages: QuestStageSpec[];
+  difficultyParams: {
+    enemySpeedMult: number;
+    hazardDensity: number;
+    puzzleDifficulty: 1 | 2 | 3 | 4 | 5;
+    timeLimitSec: number;
+    environmentalEffect: string;
+  };
+  rewards: QuestRewardBundle;
+  unlockRequirement: number;
+}
+
+export interface QuestSessionView {
+  sessionId: string;
+  questId: string;
+  levelNumber: number;
+  npcId?: string;
+  title: string;
+  description: string;
+  difficultyTier: number;
+  expectedDurationSec: number;
+  questType: LevelType;
+  state: QuestState;
+  stageIndex: number;
+  stageTotal: number;
+  currentStage: QuestStageSpec;
+  progress: number;
+  target: number;
+  pct: number;
+  timeRemainingSec?: number;
+  completedWaypoints?: string[];
+  activatedSwitches?: string[];
+  quizSessionId?: string;
+  rewards: QuestRewardBundle;
+  attempts: number;
+}
+
+export interface NpcQuotaStatus {
+  npcId: string;
+  completedInCycle: number;
+  maxPerCycle: number;
+  totalCompleted: number;
+  onCooldown: boolean;
+  cooldownUntil?: string;
+  cooldownRemainingSec: number;
+}
+
+export interface RewardBoxEntry {
+  id: string;
+  userId: string;
+  sourceType: 'quest' | 'level' | 'boss' | 'bonus';
+  sourceId: string;
+  title: string;
+  stars: number;
+  xp: number;
+  evoXp: number;
+  tickets: number;
+  status: 'unclaimed' | 'collected';
+  createdAt: string;
+  collectedAt?: string;
+}
+
+export interface NpcEncounterPayload {
+  npcId: string;
+  npcName: string;
+  npcRole: string;
+  npcIcon: string;
+  npcAccessory?: string;
+  greeting: string;
+  questId: string;
+  levelNumber: number;
+  title: string;
+  description: string;
+  questType: LevelType;
+  difficultyTier: number;
+  expectedDurationSec: number;
+  rewards: QuestRewardBundle;
+  questState: QuestState;
+  sessionId?: string;
+  canAccept: boolean;
+  canClaim: boolean;
+  npcQuota?: NpcQuotaStatus;
+  cooldownMessage?: string;
+}
+
+export interface QuizQuestionClient {
+  quizSessionId: string;
+  questionId: string;
+  index: number;
+  total: number;
+  category: QuizCategory;
+  subcategory: string;
+  difficulty: number;
+  questionText: string;
+  options: string[];
+  untimed: boolean;
+  timeLimitSec: number;
+  correctCount: number;
+  wrongCount: number;
+  passThreshold: number;
+  mediaUrl?: string;
 }

@@ -49,27 +49,32 @@ export function castleProgress(level: number): number {
 }
 
 export const KINGDOMS = [
-  { name: 'Forest',  icon: '🌳' }, { name: 'Ocean', icon: '🌊' }, { name: 'Volcano', icon: '🔥' },
-  { name: 'Ice',     icon: '❄️' }, { name: 'Blossom', icon: '🌸' }, { name: 'Shadow', icon: '🌑' }, { name: 'Sky', icon: '✨' },
+  { n: 1, id: 'emerald_hollow', name: 'Emerald Hollow', icon: '🌳', theme: 'forest', unlockLevel: 1 },
+  { n: 2, id: 'sunken_reach', name: 'Sunken Reach', icon: '🌊', theme: 'riverlands', unlockLevel: 60 },
+  { n: 3, id: 'ashfall', name: 'Ashfall', icon: '🔥', theme: 'volcano', unlockLevel: 130 },
+  { n: 4, id: 'white_silence', name: 'White Silence', icon: '❄️', theme: 'ice', unlockLevel: 220 },
+  { n: 5, id: 'bloomfall', name: 'Bloomfall', icon: '🌸', theme: 'tropical', unlockLevel: 340 },
+  { n: 6, id: 'the_hush', name: 'The Hush', icon: '🌑', theme: 'swamp', unlockLevel: 500 },
+  { n: 7, id: 'crown_spire', name: 'Crown Spire', icon: '👑', theme: 'royal_castle', unlockLevel: 700 },
 ];
 
 export const NPCS = [
-  { name: 'Wise Turtle',      icon: '🐢', role: 'Gives quests' },
-  { name: 'Ancient Owl',      icon: '🦉', role: 'Explains history' },
-  { name: 'Fox Merchant',     icon: '🦊', role: 'Sells items' },
-  { name: 'Frog Chef',        icon: '🐸', role: 'Trades food' },
-  { name: 'Bee Queen',        icon: '🐝', role: 'Seasonal missions' },
-  { name: 'Lizard Blacksmith', icon: '🦎', role: 'Upgrades gear' },
+  { name: 'Elder Moss', icon: '🧙', role: 'Story Quests · K1' },
+  { name: 'Guard Bram', icon: '🛡️', role: 'Patrol Quests · K1' },
+  { name: 'Fen the Trader', icon: '🎒', role: 'Star Collector · K1' },
+  { name: 'Oracle Reen', icon: '🔮', role: 'Marsh Quests · K2' },
+  { name: 'Forgemaster Pyra', icon: '⚒️', role: 'Caldera Trials · K3' },
+  { name: 'Sunweaver Mira', icon: '✨', role: 'Canopy Rites · K5' },
 ];
 
 export const BOSSES = [
-  { name: 'Forest Titan',  icon: '🌳', kingdom: 'Forest' },
-  { name: 'Sea Serpent',   icon: '🌊', kingdom: 'Ocean' },
-  { name: 'Lava Dragon',   icon: '🔥', kingdom: 'Volcano' },
-  { name: 'Ice Leviathan', icon: '❄️', kingdom: 'Ice' },
-  { name: 'Shadow Cobra',  icon: '🌑', kingdom: 'Shadow' },
-  { name: 'Thunder Viper', icon: '⚡', kingdom: 'Sky' },
-  { name: 'Venom Emperor', icon: '👑', kingdom: 'Final' },
+  { id: 'boss_thornmaw', name: 'Thornmaw', icon: '🐲', kingdom: 'Emerald Hollow', unlockLevel: 50 },
+  { id: 'boss_tidecoil', name: 'Tidecoil', icon: '🐉', kingdom: 'Sunken Reach', unlockLevel: 60 },
+  { id: 'boss_cinderfang', name: 'Cinderfang', icon: '🔥', kingdom: 'Ashfall', unlockLevel: 130 },
+  { id: 'boss_frostscale', name: 'Frostscale', icon: '❄️', kingdom: 'White Silence', unlockLevel: 220 },
+  { id: 'boss_petalwyrm', name: 'Petalwyrm', icon: '🌺', kingdom: 'Bloomfall', unlockLevel: 340 },
+  { id: 'boss_duskshroud', name: 'Duskshroud', icon: '👁️', kingdom: 'The Hush', unlockLevel: 500 },
+  { id: 'boss_venom_emperor', name: 'Venom Emperor', icon: '👑', kingdom: 'Crown Spire', unlockLevel: 700 },
 ];
 
 export const SEASONS = [

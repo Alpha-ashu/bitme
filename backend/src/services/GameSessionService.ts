@@ -1,3 +1,4 @@
+import { performance } from 'perf_hooks';
 import {
   GameWorldState,
   SnakeState,
@@ -10,11 +11,18 @@ import {
   GrowthStage,
   Obstacle,
   ObstacleType,
+  NpcEncounterPayload,
+  QuestSessionView,
+  QuizQuestionClient,
 } from '../types';
 import { db } from '../db/Database';
 import { antiCheat } from './AntiCheatService';
 import { ExplorerService } from './ExplorerService';
+import { kingdomByNumber, BossDef } from '../config/ExplorerContent';
 import { gameConfig } from '../config/GameConfig';
+import { NPCInteractionService } from './NPCInteractionService';
+import { QuestEngineService } from './QuestEngineService';
+import { TeamObjectiveService } from './TeamObjectiveService';
 
 interface CollectibleTemplate {
   type: CollectibleType;
@@ -27,17 +35,17 @@ interface CollectibleTemplate {
   buffDuration?: number;
 }
 
-// Power-up table — values mirror the game design board.
+// Power-up table — values mirror the uploaded asset bundle collectibles.
 const COLLECTIBLE_TABLE: CollectibleTemplate[] = [
-  { type: 'cherry', icon: '🍒', value: 10, color: '#E63950', weight: 30, hpRestore: 5 },
-  // 🍄 Mushroom is the rare "super" power (Mario-style): invincible + faster for a while.
-  { type: 'mushroom', icon: '🍄', value: 15, color: '#E85D75', weight: 7, hpRestore: 4, buff: 'super', buffDuration: 6 },
-  { type: 'apple', icon: '🍎', value: 25, color: '#EF3E36', weight: 20, hpRestore: 8 },
-  { type: 'frog', icon: '🐸', value: 30, color: '#5FB85A', weight: 16 },
+  { type: 'cherry', icon: '🍒', value: 10, color: '#E63950', weight: 28, hpRestore: 5 },
+  { type: 'mushroom', icon: '🌻', value: 20, color: '#E85D75', weight: 7, hpRestore: 5, buff: 'super', buffDuration: 6 },
+  { type: 'apple', icon: '🫑', value: 25, color: '#F59E0B', weight: 20, hpRestore: 8 },
+  { type: 'frog', icon: '💎', value: 30, color: '#10B981', weight: 14 },
+  { type: 'crystal', icon: '🔷', value: 40, color: '#38BDF8', weight: 8, hpRestore: 6 },
   // ⭐ stars are NOT spawned here — they are a dedicated set of moving collectibles (§3)
-  { type: 'shield', icon: '🛡️', value: 15, color: '#3E92CC', weight: 5, buff: 'shield', buffDuration: 8 },
-  { type: 'speed', icon: '⚡', value: 15, color: '#FFD23F', weight: 5, buff: 'speed', buffDuration: 6 },
-  { type: 'egg', icon: '🥚', value: 500, color: '#F4E9CD', weight: 2, hpRestore: 25 },
+  { type: 'shield', icon: '💚', value: 20, color: '#3E92CC', weight: 5, hpRestore: 10, buff: 'shield', buffDuration: 8 },
+  { type: 'speed', icon: '⚡', value: 20, color: '#FFD23F', weight: 5, buff: 'speed', buffDuration: 6 },
+  { type: 'egg', icon: '💎', value: 500, color: '#F4E9CD', weight: 2, hpRestore: 25 },
 ];
 
 // Milestone-gated growth — the snake does NOT grow until 500, then grows in discrete steps
@@ -52,18 +60,21 @@ const STAGE_THRESHOLDS: Array<{ stage: GrowthStage; min: number; radius: number;
   { stage: 'Titan', min: 8000, radius: 23, defense: 40, growthFactor: 0.04 }, // hard size cap
 ];
 
-// §2 Obstacle palette — blocking props soft-push snakes; cosmetic ones are decoration only.
+// §2 Obstacle palette — driven directly by the uploaded bundle objects and interactive mechanics.
 const OBSTACLE_TEMPLATES: Array<{ type: ObstacleType; icon: string; radius: number; blocking: boolean; damage?: number }> = [
-  { type: 'tree', icon: '🌳', radius: 44, blocking: true },
-  { type: 'rock', icon: '🪨', radius: 34, blocking: true },
-  { type: 'bush', icon: '🌲', radius: 32, blocking: true },
-  { type: 'cactus', icon: '🌵', radius: 30, blocking: true, damage: 15 },  // 15% HP damage on contact
-  { type: 'flowerbed', icon: '🌼', radius: 28, blocking: false }, // decorative — passable
-  { type: 'log', icon: '🪵', radius: 30, blocking: true },
-  { type: 'pond', icon: '🪷', radius: 50, blocking: false },      // water — passable
-  { type: 'hill', icon: '⛰️', radius: 46, blocking: true },
-  { type: 'lava', icon: '🔥', radius: 42, blocking: false, damage: 40 },   // 40% HP damage on contact
-  { type: 'poison', icon: '☠️', radius: 36, blocking: false, damage: 5 },  // 5% HP per sec DoT
+  { type: 'tree', icon: '🌳', radius: 46, blocking: true },           // Solid trunk + shakes loose bonus fruit on cooldown
+  { type: 'bush', icon: '🌿', radius: 34, blocking: false },          // Passable leafy cover + subtle regen/glide
+  { type: 'flowerbed', icon: '🌻', radius: 32, blocking: false },     // Sunbloom speed breeze + gentle heal
+  { type: 'pond', icon: '🏝️', radius: 54, blocking: false },          // Healing waterfall spring oasis
+  { type: 'cave', icon: '⛏️', radius: 56, blocking: true },           // Mine entrance — excavates crystal drop nearby
+  { type: 'rock', icon: '🪨', radius: 34, blocking: true },           // Solid stone outcrop
+  { type: 'hill', icon: '🧊', radius: 48, blocking: true },           // Elevated biome island
+  { type: 'log', icon: '🛢️', radius: 30, blocking: true },            // Supply barrel / root stump — drops coins on hit
+  { type: 'signpost', icon: '🪧', radius: 28, blocking: false },      // Explorer signpost marker
+  { type: 'cactus', icon: '🏜️', radius: 38, blocking: true, damage: 15 },  // Desert thorn hazard
+  { type: 'lava', icon: '🌋', radius: 44, blocking: false, damage: 35 },   // Erupting volcano hazard
+  { type: 'poison', icon: '☠️', radius: 38, blocking: false, damage: 8 },  // Cursed skull zone
+  { type: 'explosion', icon: '💣', radius: 32, blocking: false, damage: 40 }, // Pirate bomb — detonates and relocates
 ];
 
 // §8/V6 Bot policy — Free Roam & Event fill empty space with bots (real players replace them
@@ -73,6 +84,10 @@ const MODE_CONFIGS: Record<GameMode, GameModeConfig> = {
   battle_royale: { mode: 'battle_royale', label: 'Battle Royale', tagline: 'Last Snake Standing', shrinkingZone: true, teamsEnabled: false, worldEvents: true, botCount: 0, matchDurationSeconds: gameConfig.world.matchDurationSeconds },
   team: { mode: 'team', label: 'Team Mode', tagline: 'Team Battle', shrinkingZone: true, teamsEnabled: true, worldEvents: false, botCount: 0, matchDurationSeconds: gameConfig.world.matchDurationSeconds },
   event: { mode: 'event', label: 'Event Mode', tagline: 'Special Events', shrinkingZone: true, teamsEnabled: false, worldEvents: true, botCount: 20, matchDurationSeconds: gameConfig.world.matchDurationSeconds },
+  // §boss A dedicated 1v1 arena. No bots and no other players — the shrinking ring exists to
+  // stop either side running forever, and food still spawns so the player can grow mid-fight
+  // while the boss stays at its authored strength.
+  boss: { mode: 'boss', label: 'Boss Battle', tagline: 'One on One', shrinkingZone: true, teamsEnabled: false, worldEvents: false, botCount: 0, matchDurationSeconds: gameConfig.world.bossDurationSeconds },
 };
 
 export function getModeConfig(mode: GameMode): GameModeConfig {
@@ -120,22 +135,40 @@ export class GameSessionService {
   private readonly ZONE_FINAL_R: number;
   private roundStartedAt = Date.now();
   private roundEndedAt = 0;
+  private peakAliveCount = 0;
+  private kingdomNumber = 1;
+  private avgTickMs = 0;
+  private onBossDefeatCallback?: (winnerUserId: string, bossId: string) => void;
+  private onNpcEncounterCallback?: (userId: string, encounter: NpcEncounterPayload) => void;
+  private onQuestUpdateCallback?: (userId: string, update: { session: QuestSessionView; stageAdvanced: boolean; completed: boolean; failed?: boolean; feedback?: string; nextQuiz?: QuizQuestionClient | null }) => void;
+  private onWorldFeedbackCallback?: (userId: string, x: number, y: number, text: string, color: string) => void;
+  private npcInteraction = new NPCInteractionService();
   private currentEventIndex = 0;
   private availableEvents: WorldEvent[] = [
-    { id: 'evt_rain', type: 'rain_storm', title: '🌧️ Monsoon Rain Storm', description: 'Vision restricted! Frog & Star spawns tripled!', active: true, timerSeconds: 180, icon: '🌧️' },
+    { id: 'evt_rain', type: 'rain_storm', title: '🌧️ Monsoon Rain Storm', description: 'Frog & Star spawns doubled across the arena!', active: true, timerSeconds: 180, icon: '🌧️' },
     { id: 'evt_boss', type: 'boss_anaconda_raid', title: '🐉 TITAN BOSS RAID', description: 'A Titan Anaconda stalks the park centre. Team up to bring it down!', active: false, timerSeconds: 180, icon: '🐉' },
-    { id: 'evt_volcano', type: 'volcano_eruption', title: '🌋 Lava Eruption', description: 'Speed crystals erupting across the reserve!', active: false, timerSeconds: 180, icon: '🌋' },
-    { id: 'evt_coupon', type: 'treasure_balloon', title: '🎁 Treasure Box Drop', description: 'Sponsored gift boxes dropped near the city stores!', active: false, timerSeconds: 180, icon: '🎁' },
+    { id: 'evt_volcano', type: 'volcano_eruption', title: '🌋 Lava Eruption', description: 'Speed crystals & super mushrooms erupting across the reserve!', active: false, timerSeconds: 180, icon: '🌋' },
+    { id: 'evt_coupon', type: 'treasure_balloon', title: '🎁 Park Relic Drop', description: 'Golden Park Relics dropped across the reserve!', active: false, timerSeconds: 180, icon: '🎁' },
   ];
 
-  constructor(matchId: string, mode: GameMode = 'classic') {
+  constructor(
+    matchId: string,
+    mode: GameMode = 'classic',
+    options?: {
+      kingdom?: number;
+      region?: string;
+      onBossDefeat?: (winnerUserId: string, bossId: string) => void;
+    }
+  ) {
     this.config = getModeConfig(mode);
+    this.kingdomNumber = Math.max(1, Math.min(10, options?.kingdom || 1));
+    this.onBossDefeatCallback = options?.onBossDefeat;
     this.ZONE_START_R = this.WORLD_SIZE * (this.config.shrinkingZone ? gameConfig.world.zoneStartPct : 0.5);
     this.ZONE_FINAL_R = this.WORLD_SIZE * (this.config.shrinkingZone ? gameConfig.world.zoneFinalPct : 0.5);
     this.state = {
       matchId,
       mode,
-      region: 'North America East',
+      region: options?.region || 'North America East',
       status: 'in_progress',
       tick: 0,
       worldSize: this.WORLD_SIZE,
@@ -177,8 +210,55 @@ export class GameSessionService {
     this.spawnObstacles(); // §2
     this.spawnWormholes(); // §7 four linked wormholes
     this.spawnNpcs();      // §explorer villagers, elders, guards
+    if (this.config.teamsEnabled) {
+      TeamObjectiveService.initialize(this.state, this.WORLD_SIZE);
+    }
+    if (mode === 'boss') {
+      this.spawnKingdomBoss(this.kingdomNumber);
+    }
     this.spawnBotSnakes(this.config.botCount);
     this.startLoop();
+  }
+
+  public setOnNpcEncounter(cb: (userId: string, encounter: NpcEncounterPayload) => void) {
+    this.onNpcEncounterCallback = cb;
+  }
+
+  public setOnQuestUpdate(cb: (userId: string, update: {
+    session: QuestSessionView;
+    stageAdvanced: boolean;
+    completed: boolean;
+    failed?: boolean;
+    feedback?: string;
+    autoClaimedToBox?: boolean;
+    rewardBoxItem?: any;
+    npcQuota?: any;
+    nextUnlockedLevel?: number;
+    nextQuiz?: QuizQuestionClient | null;
+  }) => void) {
+    this.onQuestUpdateCallback = cb;
+  }
+
+  public setOnWorldFeedback(cb: (userId: string, x: number, y: number, text: string, color: string) => void) {
+    this.onWorldFeedbackCallback = cb;
+  }
+
+  public getAverageTickMs(): number {
+    return this.avgTickMs;
+  }
+
+  public getKingdomNumber(): number {
+    return this.kingdomNumber;
+  }
+
+  public setOnBossDefeat(cb: (winnerUserId: string, bossId: string) => void) {
+    this.onBossDefeatCallback = cb;
+  }
+
+  public backfillBots(targetTotal: number) {
+    const alive = Object.values(this.state.snakes).filter(s => s.isAlive).length;
+    const needed = Math.max(0, targetTotal - alive);
+    if (needed > 0) this.spawnBotSnakes(needed);
   }
 
   private startLoop() {
@@ -347,7 +427,7 @@ export class GameSessionService {
 
   public handlePlayerInput(userId: string, angle: number, boosting: boolean, _seq: number): void {
     const snake = this.state.snakes[userId];
-    if (!snake || !snake.isAlive || snake.isPaused) return;
+    if (!snake || !snake.isAlive || snake.isPaused || snake.inInteraction) return;
     // §17 Never trust client data — reject malformed input (NaN / Infinity angle injection).
     if (typeof angle !== 'number' || !Number.isFinite(angle)) return;
     if (!antiCheat.validatePacketFrequency(userId)) return;
@@ -381,11 +461,13 @@ export class GameSessionService {
   }
 
   public removePlayer(userId: string): void {
+    this.npcInteraction.forget(userId);
     delete this.state.snakes[userId];
   }
 
   // ---------------------------------------------------------------- main loop
   private updateTick(dt: number) {
+    const t0 = performance.now();
     this.state.tick++;
 
     if (this.config.worldEvents) this.updateWorldEvent(dt);
@@ -397,18 +479,69 @@ export class GameSessionService {
     this.updateSanctuary(dt);  // §8
 
     // Movement + hazards
+    const nowWallMs = Date.now();
     for (const id in this.state.snakes) {
       const snake = this.state.snakes[id];
-      if (!snake.isAlive || snake.isPaused) continue; // §12 paused players are frozen
+      if (snake.isMapPlanning && snake.mapPlanningStartedAt && nowWallMs - snake.mapPlanningStartedAt > 90_000) {
+        snake.isMapPlanning = false;
+        snake.isPaused = false;
+        snake.mapPlanningStartedAt = undefined;
+      }
+      if (!snake.isAlive || snake.isPaused || snake.inInteraction || snake.isMapPlanning) continue; // solo/adventure pause, map planning, or active NPC/quiz freeze
       this.updateSnake(snake, dt);
+    }
+
+    if (this.config.teamsEnabled) {
+      TeamObjectiveService.tick(this.state, dt, this.WORLD_SIZE, this.onWorldFeedbackCallback);
     }
 
     this.resolveFoodPickups();
     this.resolveCombat();
+    this.evaluateNpcAndQuestSpatial(dt);
     this.maintainCollectibles();
     if (this.state.tick % 900 === 0) this.maintainObstacles(); // §2 re-scale ~every 30s
     this.updateLeaderboard();
     this.trackPeakStats(); // §V7/P1 record server-observed peaks
+
+    const elapsedMs = performance.now() - t0;
+    this.avgTickMs = this.avgTickMs === 0 ? elapsedMs : this.avgTickMs * 0.9 + elapsedMs * 0.1;
+  }
+
+  private evaluateNpcAndQuestSpatial(dt: number) {
+    const npcs = this.state.npcs || [];
+    const runQuestTick = this.state.tick % 6 === 0;
+    for (const id in this.state.snakes) {
+      const s = this.state.snakes[id];
+      if (!s.isAlive || s.isBot) continue;
+
+      if (npcs.length > 0 && !s.isPaused && !s.inInteraction) {
+        const res = this.npcInteraction.evaluateStep(
+          s.userId, s.head.x, s.head.y, s.radius, npcs, this.WORLD_SIZE
+        );
+        if (res.entered) {
+          // Freeze movement safely during adventure NPC offer (classic/adventure only; never competitive PvP)
+          if (this.state.mode === 'classic') {
+            s.inInteraction = true;
+            s.boosting = false;
+          }
+          this.onNpcEncounterCallback?.(s.userId, res.entered);
+        }
+      }
+
+      if (runQuestTick && this.state.mode === 'classic') {
+        const qRes = QuestEngineService.recordSpatialTick(
+          s.userId, s.head.x, s.head.y, dt * 6, this.WORLD_SIZE, !!(s.isPaused || s.inInteraction)
+        );
+        if (qRes) {
+          if (qRes.feedback) this.onWorldFeedbackCallback?.(s.userId, s.head.x, s.head.y, qRes.feedback, '#059669');
+          if (qRes.nextQuiz) {
+            s.inInteraction = true;
+            s.boosting = false;
+          }
+          this.onQuestUpdateCallback?.(s.userId, qRes);
+        }
+      }
+    }
   }
 
   // §2 A mode has a timed round when its zone shrinks AND the mode declares a duration.
@@ -445,6 +578,17 @@ export class GameSessionService {
     this.state.matchTimer = Math.ceil(remaining);
     this.state.safeZone.radius = this.zoneRadiusAt(elapsed);
 
+    if (this.state.mode === 'battle_royale') {
+      const aliveCount = Object.values(this.state.snakes).filter(s => s.isAlive).length;
+      if (aliveCount > this.peakAliveCount) this.peakAliveCount = aliveCount;
+      if (elapsed >= 5 && this.peakAliveCount >= 2 && aliveCount <= 1) {
+        this.state.matchOver = true;
+        this.state.matchTimer = 0;
+        this.roundEndedAt = Date.now();
+        return;
+      }
+    }
+
     if (remaining <= 0) {
       this.state.matchOver = true;
       this.state.matchTimer = 0;
@@ -465,11 +609,16 @@ export class GameSessionService {
   private startNewRound() {
     this.roundStartedAt = Date.now();
     this.roundEndedAt = 0;
+    this.peakAliveCount = 0;
     this.state.matchOver = false;
     this.state.round = (this.state.round ?? 1) + 1;
     this.state.matchTimer = this.config.matchDurationSeconds ?? this.MATCH_SECONDS;
     this.state.safeZone.radius = this.ZONE_START_R;
-    if (this.state.teamScores) this.state.teamScores = { red: 0, blue: 0 };
+    if (this.state.teamScores) {
+      this.state.teamScores = { red: 0, blue: 0 };
+      TeamObjectiveService.initialize(this.state, this.WORLD_SIZE);
+    }
+    if (this.state.mode === 'boss') this.spawnKingdomBoss(this.kingdomNumber);
     console.log(`[SESSION] ${this.state.mode} — round ${this.state.round} started, zone reopened.`);
   }
 
@@ -490,6 +639,15 @@ export class GameSessionService {
     if (snake.superTimer && snake.superTimer > 0) snake.superTimer = Math.max(0, snake.superTimer - dt);
     if (snake.abilityCooldown > 0) snake.abilityCooldown = Math.max(0, snake.abilityCooldown - dt);
     if (snake.abilityActiveTimer > 0) snake.abilityActiveTimer = Math.max(0, snake.abilityActiveTimer - dt);
+    if (snake.poisonTimer && snake.poisonTimer > 0) {
+      snake.poisonTimer = Math.max(0, snake.poisonTimer - dt);
+      if (snake.shieldTimer <= 0 && (snake.superTimer ?? 0) <= 0 && !this.isInsideSanctuary(snake)) {
+        this.damageSnake(snake, 6 * dt, 'Poisoned by cursed skull');
+        if (!snake.isAlive) return;
+      } else {
+        snake.poisonTimer = 0;
+      }
+    }
 
     if (snake.isAutoProtectAI) {
       snake.autoProtectTimer -= dt;
@@ -552,36 +710,82 @@ export class GameSessionService {
       }
     }
 
-    // §2/§3 Obstacle collision — blocking props push head out cleanly; explicit hazards deal configurable damage.
+    // §2/§3 Obstacle collision & interactive prop logic
     const HAZARD_DAMAGE_MAP: Record<string, number> = {
-      small_cactus: 10, cactus: 10, large_cactus: 20,
-      poison_plant: 15, poison: 15, stone_trap: 15,
-      spike_trap: 25, spikes: 25, lava: 50,
+      small_cactus: 10, cactus: 15, large_cactus: 20,
+      poison_plant: 8, poison: 8, stone_trap: 15,
+      spike_trap: 25, spikes: 25, lava: 35, explosion: 45,
     };
 
     if (this.state.obstacles) {
       for (const ob of this.state.obstacles) {
-        const dx = snake.head.x - ob.x;
-        const dy = snake.head.y - ob.y;
+        const dx = this.wrapDelta(snake.head.x - ob.x);
+        const dy = this.wrapDelta(snake.head.y - ob.y);
         const minDist = ob.radius + snake.radius;
         const distSq = dx * dx + dy * dy;
-        if (distSq >= minDist * minDist) continue;
+        const touchDist = ob.type === 'cave' || ob.type === 'tree' || ob.type === 'log' ? (minDist + 10) : minDist;
+        if (distSq >= touchDist * touchDist) continue;
 
-        // Physical blocking props (trees, ponds, rocks, hills, caves) push the snake out smoothly WITHOUT dealing damage
-        if (ob.blocking && distSq > 0.01) {
-          const dist = Math.sqrt(distSq);
-          const push = (minDist - dist);
-          snake.head.x += (dx / dist) * push;
-          snake.head.y += (dy / dist) * push;
+        // Interactive prop behaviors driven by the bundle objects
+        if (ob.type === 'pond') {
+          if (snake.poisonTimer && snake.poisonTimer > 0) snake.poisonTimer = 0;
+          if (snake.hp < snake.maxHp) snake.hp = Math.min(snake.maxHp, snake.hp + 15 * dt);
+        } else if (ob.type === 'flowerbed') {
+          snake.speedBoostTimer = Math.max(snake.speedBoostTimer, 0.45);
+          if (snake.hp < snake.maxHp) snake.hp = Math.min(snake.maxHp, snake.hp + 5 * dt);
+        } else if (ob.type === 'bush') {
+          if (snake.hp < snake.maxHp) snake.hp = Math.min(snake.maxHp, snake.hp + 3.5 * dt);
+        } else if ((ob.type === 'tree' || ob.type === 'cave' || ob.type === 'log') && this.state.tick >= (ob.interactCooldownUntil ?? 0)) {
+          ob.interactCooldownUntil = this.state.tick + (ob.type === 'cave' ? 300 : 240);
+          const ang = Math.atan2(dy || 1, dx || 1);
+          const dropDist = ob.radius + 36;
+          const dropX = this.wrap(ob.x + Math.cos(ang) * dropDist);
+          const dropY = this.wrap(ob.y + Math.sin(ang) * dropDist);
+          const dropType = ob.type === 'cave' ? 'crystal' : (ob.type === 'log' ? 'super_star' : 'cherry');
+          const dropId = `prop_${this.state.tick}_${Math.random().toString(36).slice(2, 6)}`;
+          this.state.food[dropId] = {
+            id: dropId,
+            x: dropX,
+            y: dropY,
+            value: ob.type === 'cave' ? 40 : (ob.type === 'log' ? 35 : 15),
+            type: dropType,
+            color: ob.type === 'cave' ? '#38BDF8' : (ob.type === 'log' ? '#FACC15' : '#E63950'),
+            hpRestore: ob.type === 'tree' ? 6 : 4,
+          };
+          this.worldVersion++;
         }
 
-        // Only explicit hazards (cacti, poison, traps, lava) deal damage, guarded by an i-frame hit cooldown (18 ticks = ~600ms)
-        const hazardDamage = HAZARD_DAMAGE_MAP[ob.type] || ob.damage;
+        if (distSq >= minDist * minDist) continue;
+
+        // Solid blocking props (stones, hills, caves, trees, logs, cactus) push out + slide smoothly
+        if (ob.blocking && distSq > 0.01) {
+          const dist = Math.sqrt(distSq);
+          const nx = dx / dist, ny = dy / dist;
+          const push = (minDist - dist);
+          snake.head.x = this.wrap(snake.head.x + nx * push);
+          snake.head.y = this.wrap(snake.head.y + ny * push);
+          // Subtle tangential slide deflection so snakes don't wedge dead-center on rocks
+          const dot = Math.cos(snake.angle) * nx + Math.sin(snake.angle) * ny;
+          if (dot < -0.25) {
+            const cross = Math.cos(snake.angle) * ny - Math.sin(snake.angle) * nx;
+            snake.angle += (cross >= 0 ? -0.18 : 0.18);
+          }
+        }
+
+        // Hazards deal configured/i-framed damage; Danger Skull applies poison curse; Skull Bomb detonates & relocates
+        const hazardDamage = ob.damage ?? HAZARD_DAMAGE_MAP[ob.type];
         if (hazardDamage) {
           const now = this.state.tick;
           if (!snake.lastHitTick || now - snake.lastHitTick > 18) {
             snake.lastHitTick = now;
+            if (ob.type === 'poison' && snake.shieldTimer <= 0 && (snake.superTimer ?? 0) <= 0) {
+              snake.poisonTimer = Math.max(snake.poisonTimer ?? 0, 3.5);
+            }
             this.damageSnake(snake, hazardDamage, `Hurt by ${ob.type}`);
+            if (ob.type === 'explosion') {
+              const nextSpot = this.openSpot(ob.radius, this.state.obstacles);
+              if (nextSpot) { ob.x = nextSpot.x; ob.y = nextSpot.y; this.worldVersion++; }
+            }
           }
           if (!snake.isAlive) return;
         }
@@ -708,18 +912,31 @@ export class GameSessionService {
     }
 
     this.applyGrowth(snake, food.value);
+    if (this.config.teamsEnabled && snake.team) {
+      TeamObjectiveService.recordResourceScore(this.state, snake, food.value);
+    }
 
     if (!snake.isBot) {
       // Mission + achievement + lifetime-stat telemetry, credited the instant it happens.
-      //
-      // The collectible's own `type` IS the metric, so a new power-up added to the spawn table
-      // starts counting with no change here — the previous if/else chain silently dropped
-      // anything it did not name (mushrooms and speed pickups were never recorded at all).
       const u = snake.userId;
       db.incrementCollectible(u, food.type as any);
+      if (food.type === 'star' || food.type === 'super_star') {
+        if (db.getProfile(u)) db.grantRewards(u, { stars: food.type === 'super_star' ? 3 : 1 });
+      }
       if (food.type === 'egg' || food.type === 'coupon_box') db.incrementCollectible(u, 'treasure');
       if (food.buff) db.incrementCollectible(u, 'powerup');
       if (food.hpRestore && wasHurt) db.incrementCollectible(u, 'heal');
+
+      if (this.state.mode === 'classic') {
+        const qRes = QuestEngineService.recordGameplayMetric(u, food.type, 1);
+        if (qRes) {
+          if (qRes.nextQuiz) {
+            snake.inInteraction = true;
+            snake.boosting = false;
+          }
+          this.onQuestUpdateCallback?.(u, qRes);
+        }
+      }
 
       const updatedMissions = db.getMissions(u);
       if (this.onPickupCallback) {
@@ -761,12 +978,12 @@ export class GameSessionService {
     const ids = Object.keys(this.state.snakes);
     for (let i = 0; i < ids.length; i++) {
       const a = this.state.snakes[ids[i]];
-      if (!a || !a.isAlive || a.isPaused) continue;
+      if (!a || !a.isAlive || a.isPaused || a.inInteraction) continue;
 
       // Pair each snake with each other snake exactly once (j starts at i + 1).
       for (let j = i + 1; j < ids.length; j++) {
         const b = this.state.snakes[ids[j]];
-        if (!b || !b.isAlive || b.isPaused) continue;
+        if (!b || !b.isAlive || b.isPaused || b.inInteraction) continue;
         if (this.config.teamsEnabled && a.team && a.team === b.team) continue; // no friendly fire
 
         // Heads must actually be touching — this is the ONLY collision that matters (toroidal).
@@ -793,21 +1010,29 @@ export class GameSessionService {
     }
   }
 
-  // Eliminate the lower-score snake in a head-to-head clash and reward the winner.
   private eliminateInClash(loser: SnakeState, winner: SnakeState) {
     this.killSnake(loser, `Head-on clash with ${winner.displayName}`);
-    if (loser.isAlive) return; // defensive: sanctuary/shield already filtered by the caller
+    if (loser.isAlive) return;
     winner.kills++;
     winner.score += 200 + Math.floor(loser.score * 0.25);
     this.applyGrowth(winner, 0);
     if (this.config.teamsEnabled && winner.team && this.state.teamScores) {
-      this.state.teamScores[winner.team] += 1;
-      // §stats Assists only exist in Team Battle: elsewhere a kill is a 1v1 head clash with
-      // exactly one winner and nobody to assist. A teammate who was pressuring the same
-      // victim — close enough to have forced the engagement — is credited.
+      TeamObjectiveService.recordKillScore(this.state, winner.team, winner);
       this.creditAssists(winner, loser);
     }
-    if (!winner.isBot) db.incrementCollectible(winner.userId, 'kill');
+    if (!winner.isBot) {
+      db.incrementCollectible(winner.userId, 'kill');
+      if (this.state.mode === 'classic') {
+        const qRes = QuestEngineService.recordGameplayMetric(winner.userId, 'kill', 1);
+        if (qRes) this.onQuestUpdateCallback?.(winner.userId, qRes);
+      }
+      if (loser.isBoss && this.state.mode === 'boss') {
+        this.state.matchOver = true;
+        this.state.matchTimer = 0;
+        this.roundEndedAt = Date.now();
+        this.onBossDefeatCallback?.(winner.userId, loser.id);
+      }
+    }
   }
 
   // Teammates within this range of the victim at the moment of the kill share the credit.
@@ -851,9 +1076,8 @@ export class GameSessionService {
 
     if (!snake.userId.startsWith('bot_') && !snake.isBoss) {
       db.updateLeaderboard(snake.userId, snake.displayName, Math.round(snake.score), false);
-    } else if (!snake.isBoss) {
-      // Respawn bots to keep the world alive. Skipped once the session has been stopped, so a
-      // torn-down simulation can't keep resurrecting snakes into a dead world.
+    } else if (!snake.isBoss && this.state.mode !== 'battle_royale') {
+      // Respawn bots to keep casual/event/team worlds alive (never in Battle Royale Last Snake Standing).
       const t = setTimeout(() => {
         this.botRespawnTimers.delete(t);
         if (this.state.status === 'ended') return;
@@ -868,12 +1092,38 @@ export class GameSessionService {
   private updateWorldEvent(dt: number) {
     this.eventTimer -= dt;
     if (this.eventTimer <= 0) {
-      this.eventTimer = gameConfig.world.eventDurationSeconds; // §12 config-driven, not a literal
+      this.eventTimer = gameConfig.world.eventDurationSeconds;
       this.currentEventIndex = (this.currentEventIndex + 1) % this.availableEvents.length;
-      this.state.currentEvent = this.availableEvents[this.currentEventIndex];
+      this.state.currentEvent = { ...this.availableEvents[this.currentEventIndex] };
       if (this.state.currentEvent.type === 'boss_anaconda_raid') this.spawnBossAnaconda();
+      if (this.state.currentEvent.type === 'treasure_balloon') this.spawnTreasureRelics(4);
     }
     if (this.state.currentEvent) this.state.currentEvent.timerSeconds = Math.ceil(this.eventTimer);
+  }
+
+  private spawnKingdomBoss(kingdomNum: number) {
+    for (const id in this.state.snakes) {
+      if (this.state.snakes[id].isBoss) delete this.state.snakes[id];
+    }
+    const kingdom = kingdomByNumber(kingdomNum) || kingdomByNumber(1)!;
+    const b: BossDef = kingdom.boss || {
+      id: 'boss_thornmaw', kingdom: 1, name: 'Thornmaw', icon: '🐲',
+      intro: 'The forest Guardian awakens.', unlockLevel: 50, hp: 600, speed: 200, radius: 30, score: 4000,
+    };
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 580;
+    const bx = this.wrap(this.WORLD_SIZE / 2 + Math.cos(angle) * dist);
+    const by = this.wrap(this.WORLD_SIZE / 2 + Math.sin(angle) * dist);
+    const body = Array.from({ length: 34 }, (_, i) => ({ x: this.wrap(bx - i * 18), y: by }));
+    this.state.snakes[b.id] = {
+      id: b.id, userId: b.id, displayName: `${b.icon} ${b.name}`, skin: 'Shadow',
+      head: { x: bx, y: by }, body, angle: angle + Math.PI, speed: b.speed, speedPct: 75, boosting: false,
+      score: b.score, level: b.unlockLevel, length: body.length, radius: b.radius, hp: b.hp, maxHp: b.hp,
+      defense: 40 + kingdomNum * 5, stage: 'Titan', evolution: 'Leviathan',
+      isAlive: true, isAutoProtectAI: false, autoProtectTimer: 0,
+      kills: 0, shieldTimer: 0, speedBoostTimer: 0, abilityCooldown: 0, abilityActiveTimer: 0,
+      distanceTravelled: 0, isBot: true, isBoss: true,
+    };
   }
 
   private spawnBossAnaconda() {
@@ -890,29 +1140,61 @@ export class GameSessionService {
     };
   }
 
-  // ---------------------------------------------------------------- bots
+  private spawnTreasureRelics(count: number) {
+    for (let i = 0; i < count; i++) {
+      const id = `relic_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      this.state.food[id] = {
+        id,
+        x: 300 + Math.random() * (this.WORLD_SIZE - 600),
+        y: 300 + Math.random() * (this.WORLD_SIZE - 600),
+        value: 200,
+        type: 'coupon_box',
+        icon: '🎁',
+        color: '#FFD23F',
+        buff: 'shield',
+        buffDuration: 6,
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------- bots & bosses
   private updateBotAI(snake: SnakeState, _dt: number) {
-    // Seek the nearest food; occasionally hunt a smaller rival; avoid the storm edge.
     let target: Vector2D | null = null;
     let minDist = 500 * 500;
 
-    for (const fId in this.state.food) {
-      const food = this.state.food[fId];
-      const dx = this.wrapDelta(food.x - snake.head.x);
-      const dy = this.wrapDelta(food.y - snake.head.y);
-      const d = dx * dx + dy * dy;
-      if (d < minDist) { minDist = d; target = { x: food.x, y: food.y }; }
-    }
-
-    // Hunt weaker snakes when they are close
-    for (const id in this.state.snakes) {
-      const other = this.state.snakes[id];
-      if (id === snake.id || !other.isAlive) continue;
-      if (other.score < snake.score * 0.7) {
+    if (snake.isBoss) {
+      // Bosses lock onto the closest living challenger across the arena
+      let nearestPlayerDist = Infinity;
+      for (const id in this.state.snakes) {
+        const other = this.state.snakes[id];
+        if (id === snake.id || !other.isAlive || other.isBot) continue;
         const dx = this.wrapDelta(other.head.x - snake.head.x);
         const dy = this.wrapDelta(other.head.y - snake.head.y);
         const d = dx * dx + dy * dy;
-        if (d < 320 * 320 && d < minDist) { minDist = d; target = { x: other.head.x, y: other.head.y }; }
+        if (d < nearestPlayerDist) {
+          nearestPlayerDist = d;
+          target = { x: other.head.x, y: other.head.y };
+        }
+      }
+    } else {
+      for (const fId in this.state.food) {
+        const food = this.state.food[fId];
+        const dx = this.wrapDelta(food.x - snake.head.x);
+        const dy = this.wrapDelta(food.y - snake.head.y);
+        const d = dx * dx + dy * dy;
+        if (d < minDist) { minDist = d; target = { x: food.x, y: food.y }; }
+      }
+
+      // Hunt weaker snakes when they are close (never chase paused/planning/NPC-interacting players)
+      for (const id in this.state.snakes) {
+        const other = this.state.snakes[id];
+        if (id === snake.id || !other.isAlive || other.isPaused || other.inInteraction || other.isMapPlanning) continue;
+        if (other.score < snake.score * 0.7) {
+          const dx = this.wrapDelta(other.head.x - snake.head.x);
+          const dy = this.wrapDelta(other.head.y - snake.head.y);
+          const d = dx * dx + dy * dy;
+          if (d < 320 * 320 && d < minDist) { minDist = d; target = { x: other.head.x, y: other.head.y }; }
+        }
       }
     }
 
@@ -921,19 +1203,59 @@ export class GameSessionService {
       let diff = targetAngle - snake.angle;
       while (diff < -Math.PI) diff += Math.PI * 2;
       while (diff > Math.PI) diff -= Math.PI * 2;
-      snake.angle += diff * 0.12;
+      snake.angle += diff * (snake.isBoss ? 0.14 : 0.12);
     } else {
       snake.angle += (Math.random() - 0.5) * 0.2;
     }
 
-    snake.boosting = Math.random() < 0.02 && snake.body.length > 14;
+    // Keep bots clear of Quest Master NPC circles so they don't ambush players talking to NPCs
+    if (this.state.npcs?.length) {
+      for (const npc of this.state.npcs) {
+        const dx = this.wrapDelta(npc.x - snake.head.x);
+        const dy = this.wrapDelta(npc.y - snake.head.y);
+        const keepOut = (npc.radius || 46) + snake.radius + 145;
+        if (dx * dx + dy * dy < keepOut * keepOut) {
+          const away = Math.atan2(-dy, -dx);
+          let diff = away - snake.angle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          snake.angle += diff * 0.35;
+          break;
+        }
+      }
+    }
+
+    if (this.state.obstacles?.length) {
+      for (const ob of this.state.obstacles) {
+        if (!ob.blocking && !ob.damage) continue;
+        const dx = this.wrapDelta(ob.x - snake.head.x);
+        const dy = this.wrapDelta(ob.y - snake.head.y);
+        const avoidR = ob.radius + snake.radius + 78;
+        if (dx * dx + dy * dy < avoidR * avoidR) {
+          const away = Math.atan2(-dy, -dx);
+          let diff = away - snake.angle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          snake.angle += diff * 0.28;
+          break;
+        }
+      }
+    }
+
+    snake.boosting = !snake.isBoss && Math.random() < 0.02 && snake.body.length > 14;
   }
 
   // ---------------------------------------------------------------- spawning
   private pickTemplate(): CollectibleTemplate {
-    const total = COLLECTIBLE_TABLE.reduce((s, t) => s + t.weight, 0);
+    const activeEvent = this.state.currentEvent?.type;
+    const adjusted = COLLECTIBLE_TABLE.map(t => {
+      if (activeEvent === 'rain_storm' && t.type === 'frog') return { ...t, weight: t.weight * 2.5 };
+      if (activeEvent === 'volcano_eruption' && (t.type === 'mushroom' || t.type === 'speed')) return { ...t, weight: t.weight * 2.5 };
+      return t;
+    });
+    const total = adjusted.reduce((s, t) => s + t.weight, 0);
     let r = Math.random() * total;
-    for (const t of COLLECTIBLE_TABLE) {
+    for (const t of adjusted) {
       r -= t.weight;
       if (r <= 0) return t;
     }
@@ -962,18 +1284,17 @@ export class GameSessionService {
       };
     }
 
-    // Sponsored gift boxes near the city hubs (spawn once)
+    // Neutral Park Relic drops near hubs (replaces third-party branded boxes)
     if (!this.state.food['coupon_box_0']) {
-      const coupons = [
-        { store: 'Starbucks', text: '20% OFF Iced Latte', code: 'ANACONDA20', x: 640, y: 1440 },
-        { store: 'Pizza Hut', text: 'Free Garlic Bread', code: 'PIZZAANACONDA', x: 2240, y: 1440 },
-        { store: 'McDonalds', text: 'Buy 1 Get 1 Free', code: 'MCDANACONDA', x: 1440, y: 640 },
+      const relics = [
+        { name: 'Park Ranger Crate', desc: 'Royal Arena Bonus Cache', x: 640, y: 1440 },
+        { name: 'Ancient Emerald Chest', desc: 'Sanctuary Supply Cache', x: 2240, y: 1440 },
+        { name: 'Golden Seed Vault', desc: 'Crown Spire Supply Cache', x: 1440, y: 640 },
       ];
-      coupons.forEach((c, idx) => {
+      relics.forEach((c, idx) => {
         this.state.food[`coupon_box_${idx}`] = {
           id: `coupon_box_${idx}`, x: c.x, y: c.y, value: 200, type: 'coupon_box',
-          icon: '🎁', color: '#FFD23F',
-          couponData: { id: `cpn_${idx}`, storeName: c.store, discountText: c.text, promoCode: c.code, expiryDate: '2026-12-31', icon: '🎟️' },
+          icon: '🎁', color: '#FFD23F', buff: 'shield', buffDuration: 5,
         };
       });
     }
@@ -1019,7 +1340,8 @@ export class GameSessionService {
     }
     // Respawn toward the target with a short delay after a star is collected (§3).
     this.starCooldown -= dt;
-    if (count < this.STAR_TARGET && this.starCooldown <= 0 && this.starCount() < this.STAR_MAX) {
+    const starTarget = this.state.currentEvent?.type === 'rain_storm' ? Math.min(this.STAR_MAX, this.STAR_TARGET * 2) : this.STAR_TARGET;
+    if (count < starTarget && this.starCooldown <= 0 && this.starCount() < this.STAR_MAX) {
       this.spawnMovingStar();
       this.starCooldown = 1.5;
     }
@@ -1133,7 +1455,7 @@ export class GameSessionService {
   private desiredObstacleCount(): number {
     const avg = this.averageScore();
     const tier = avg >= 1000 ? 2 : avg >= 200 ? 1 : 0; // scales with avg lobby progression
-    return [22, 34, 46][tier]; // §8 more obstacles across the larger map
+    return [44, 58, 72][tier]; // Rich interactive props & hazards across the 6000x6000 map
   }
 
   private averageScore(): number {
@@ -1165,17 +1487,21 @@ export class GameSessionService {
     if (obstacles.length !== before) this.worldVersion++;
   }
 
-  // Find an open spot that guarantees a navigable path — props keep wide lanes between them.
   private openSpot(radius: number, existing: Obstacle[]): Vector2D | null {
     for (let tries = 0; tries < 30; tries++) {
       const x = 220 + Math.random() * (this.WORLD_SIZE - 440);
       const y = 220 + Math.random() * (this.WORLD_SIZE - 440);
       const sc = this.state.sanctuaryZone;
-      if (sc) { const dx = x - sc.centerX, dy = y - sc.centerY; if (dx * dx + dy * dy < (sc.radius + 120) * (sc.radius + 120)) continue; }
+      if (sc) {
+        const dx = this.wrapDelta(x - sc.centerX);
+        const dy = this.wrapDelta(y - sc.centerY);
+        if (dx * dx + dy * dy < (sc.radius + 120) * (sc.radius + 120)) continue;
+      }
       let ok = true;
       for (const o of existing) {
-        const dx = x - o.x, dy = y - o.y;
-        const gap = radius + o.radius + 140; // wide spacing → always a lane between props
+        const dx = this.wrapDelta(x - o.x);
+        const dy = this.wrapDelta(y - o.y);
+        const gap = radius + o.radius + 140;
         if (dx * dx + dy * dy < gap * gap) { ok = false; break; }
       }
       if (ok) return { x, y };
@@ -1183,12 +1509,162 @@ export class GameSessionService {
     return null;
   }
 
-  // ---------------------------------------------------------------- §12 pause protection
-  public setPlayerInactive(userId: string, inactive: boolean): void {
+  // ---------------------------------------------------------------- §12 pause & safe interaction freeze
+  // Competitive modes (battle_royale, team, boss, event) NEVER allow client pause/interaction invulnerability!
+  public setPlayerInactive(userId: string, inactive: boolean): boolean {
     const snake = this.state.snakes[userId];
-    if (!snake) return;
+    if (!snake) return false;
+    if (inactive && this.state.mode !== 'classic') return false;
     snake.isPaused = inactive;
     if (inactive) snake.boosting = false;
+    return true;
+  }
+
+  public setPlayerInteraction(userId: string, active: boolean): boolean {
+    const snake = this.state.snakes[userId];
+    if (!snake) return false;
+    if (active && this.state.mode !== 'classic') return false;
+    snake.inInteraction = active;
+    if (active) snake.boosting = false;
+    return true;
+  }
+
+  /**
+   * Tactical Map safe planning pause: pauses & protects the player while planning route on the Arena Map
+   * so no enemy snake, bot, or hazard can attack them while planning. Grants 1.5s grace shield on resume.
+   */
+  public setPlayerMapPlanning(userId: string, active: boolean): boolean {
+    const snake = this.state.snakes[userId];
+    if (!snake || !snake.isAlive) return false;
+    if (active) {
+      snake.isMapPlanning = true;
+      snake.isPaused = true;
+      snake.boosting = false;
+      snake.mapPlanningStartedAt = Date.now();
+    } else {
+      snake.isMapPlanning = false;
+      snake.isPaused = false;
+      snake.mapPlanningStartedAt = undefined;
+      snake.shieldTimer = Math.max(snake.shieldTimer || 0, 1.5);
+    }
+    return true;
+  }
+
+  /**
+   * Deploy player cleanly to a fresh, enemy-free zone upon accepting a quest
+   * so rival snakes/bots cannot immediately ambush them right beside the Quest Master.
+   */
+  public deployPlayerToSafeQuestArea(
+    userId: string,
+    targetHint?: { x: number; y: number } | null
+  ): { ok: boolean; x?: number; y?: number; minEnemyDistance?: number } {
+    const snake = this.state.snakes[userId];
+    if (!snake || !snake.isAlive) return { ok: false };
+
+    const enemies = Object.values(this.state.snakes).filter(s => s.isAlive && s.id !== snake.id);
+    const obstacles = this.state.obstacles || [];
+    const npcs = this.state.npcs || [];
+
+    let bestSpot = { x: this.wrap(snake.head.x + 900), y: this.wrap(snake.head.y + 700) };
+    let bestScore = -Infinity;
+    let bestEnemyDist = 0;
+
+    for (let i = 0; i < 48; i++) {
+      let cx: number;
+      let cy: number;
+      if (targetHint && i < 16) {
+        const ang = (i / 16) * Math.PI * 2;
+        const r = 340 + (i % 3) * 140;
+        cx = this.wrap(targetHint.x + Math.cos(ang) * r);
+        cy = this.wrap(targetHint.y + Math.sin(ang) * r);
+      } else {
+        cx = 260 + Math.random() * (this.WORLD_SIZE - 520);
+        cy = 260 + Math.random() * (this.WORLD_SIZE - 520);
+      }
+
+      // Skip spots overlapping any obstacle or NPC
+      let blocked = false;
+      for (const ob of obstacles) {
+        const dx = this.wrapDelta(cx - ob.x);
+        const dy = this.wrapDelta(cy - ob.y);
+        const pad = ob.radius + snake.radius + 90;
+        if (dx * dx + dy * dy < pad * pad) { blocked = true; break; }
+      }
+      if (blocked) continue;
+      for (const npc of npcs) {
+        const dx = this.wrapDelta(cx - npc.x);
+        const dy = this.wrapDelta(cy - npc.y);
+        const pad = (npc.radius || 46) + 260;
+        if (dx * dx + dy * dy < pad * pad) { blocked = true; break; }
+      }
+      if (blocked) continue;
+
+      let minEnemyDist = 2500;
+      for (const e of enemies) {
+        const dx = this.wrapDelta(cx - e.head.x);
+        const dy = this.wrapDelta(cy - e.head.y);
+        const d = Math.hypot(dx, dy);
+        if (d < minEnemyDist) minEnemyDist = d;
+      }
+
+      // Also prefer moving genuinely away from old congested spot (>= 500px)
+      const movedDist = Math.hypot(this.wrapDelta(cx - snake.head.x), this.wrapDelta(cy - snake.head.y));
+      const score = Math.min(1400, minEnemyDist) * 2 + Math.min(700, movedDist) * 0.45;
+      if (score > bestScore) {
+        bestScore = score;
+        bestSpot = { x: cx, y: cy };
+        bestEnemyDist = minEnemyDist;
+      }
+    }
+
+    snake.head.x = bestSpot.x;
+    snake.head.y = bestSpot.y;
+    const backX = -Math.cos(snake.angle);
+    const backY = -Math.sin(snake.angle);
+    for (let i = 0; i < snake.body.length; i++) {
+      snake.body[i].x = this.wrap(bestSpot.x + backX * (i + 1) * 14);
+      snake.body[i].y = this.wrap(bestSpot.y + backY * (i + 1) * 14);
+    }
+
+    snake.inInteraction = false;
+    snake.isPaused = false;
+    snake.isMapPlanning = false;
+    snake.boosting = false;
+    snake.shieldTimer = Math.max(snake.shieldTimer || 0, 4.5); // 4.5s fresh-area spawn shield
+    this.npcInteraction.forget(userId); // clean NPC entry state after relocation
+    this.onWorldFeedbackCallback?.(userId, bestSpot.x, bestSpot.y, 'DEPLOYED TO FRESH ZONE!', '#059669');
+    return { ok: true, x: bestSpot.x, y: bestSpot.y, minEnemyDistance: Math.round(bestEnemyDist) };
+  }
+
+  /** Activate a player-owned consumable power-up charge (Boost / Shield / Super) live in the arena. */
+  public applyPurchasedPowerup(userId: string, powerupId: 'pw_boost' | 'pw_shield' | 'pw_super'): boolean {
+    const snake = this.state.snakes[userId];
+    if (!snake || !snake.isAlive) return false;
+    if (powerupId === 'pw_boost') {
+      snake.speedBoostTimer = Math.max(snake.speedBoostTimer || 0, 10);
+      this.onWorldFeedbackCallback?.(userId, snake.head.x, snake.head.y, 'SPEED BOOST +10s!', '#D97706');
+    } else if (powerupId === 'pw_shield') {
+      snake.shieldTimer = Math.max(snake.shieldTimer || 0, 10);
+      this.onWorldFeedbackCallback?.(userId, snake.head.x, snake.head.y, 'GUARD SHIELD +10s!', '#0284C7');
+    } else if (powerupId === 'pw_super') {
+      snake.superTimer = Math.max(snake.superTimer || 0, 8);
+      snake.speedBoostTimer = Math.max(snake.speedBoostTimer || 0, 8);
+      this.onWorldFeedbackCallback?.(userId, snake.head.x, snake.head.y, 'SUPER SURGE +8s!', '#DB2777');
+    }
+    return true;
+  }
+
+  public validateManualNpcInteract(userId: string, npcId: string): { ok: boolean; error?: string; encounter?: NpcEncounterPayload } {
+    const snake = this.state.snakes[userId];
+    if (!snake || !snake.isAlive) return { ok: false, error: 'Snake is not active in world' };
+    const res = this.npcInteraction.validateManualInteract(
+      userId, npcId, snake.head.x, snake.head.y, snake.radius, this.state.npcs || [], this.WORLD_SIZE
+    );
+    if (res.ok && this.state.mode === 'classic') {
+      snake.inInteraction = true;
+      snake.boosting = false;
+    }
+    return res;
   }
 
   // ---------------------------------------------------------------- broadcast shaping
@@ -1227,6 +1703,7 @@ export class GameSessionService {
         shieldTimer: r1(s.shieldTimer),
         speedBoostTimer: r1(s.speedBoostTimer),
         superTimer: s.superTimer === undefined ? undefined : r1(s.superTimer),
+        poisonTimer: s.poisonTimer ? r1(s.poisonTimer) : 0,
         abilityCooldown: r1(s.abilityCooldown),
         abilityActiveTimer: r1(s.abilityActiveTimer),
       };
@@ -1240,6 +1717,10 @@ export class GameSessionService {
       sanctuaryZone: this.state.sanctuaryZone,
       leaderboard: this.state.leaderboard,
       teamScores: this.state.teamScores,
+      teamZones: this.state.teamZones,
+      teamRelics: this.state.teamRelics,
+      teamBases: this.state.teamBases,
+      teamObjectiveBreakdown: this.state.teamObjectiveBreakdown,
       currentEvent: this.state.currentEvent,
       matchTimer: this.state.matchTimer,
       matchOver: this.state.matchOver,
@@ -1294,7 +1775,7 @@ export class GameSessionService {
   // campaign API, not the 30 Hz tick.
   private spawnNpcs() {
     if (this.state.mode !== 'classic') return; // Explorer runs on the classic session
-    this.state.npcs = ExplorerService.npcPlacements(this.WORLD_SIZE).map(n => ({
+    this.state.npcs = ExplorerService.npcPlacements(this.WORLD_SIZE, this.kingdomNumber).map(n => ({
       id: n.id, name: n.name, role: n.role, icon: n.icon, accessory: n.accessory,
       kingdom: n.kingdom, x: n.wx, y: n.wy, radius: 46,
     }));

@@ -1,89 +1,67 @@
-/**
- * Power & Portal Asset Registry
- */
+// Uploaded Bundle Power-Up & Portal Sprite Renderer
+
+import { drawSpriteCentered } from './spriteCache.js';
+
+export function renderShieldPowerAsset(ctx: CanvasRenderingContext2D, x: number, y: number, animFrame: number, r = 17) {
+  const pulse = 1 + Math.sin(animFrame * 0.12 + x) * 0.07;
+  drawSpriteCentered(ctx, 'ui_heart_wood', x, y, r * 2.4 * pulse, {
+    shadow: true,
+    auraColor: 'rgba(34, 197, 94, 0.28)',
+  });
+}
+
+export function renderSpeedPowerAsset(ctx: CanvasRenderingContext2D, x: number, y: number, animFrame: number, r = 17) {
+  const pulse = 1 + Math.sin(animFrame * 0.14 + y) * 0.08;
+  drawSpriteCentered(ctx, 'ui_bolt_wood', x, y, r * 2.5 * pulse, {
+    shadow: true,
+    auraColor: 'rgba(250, 204, 21, 0.3)',
+  });
+}
 
 export function renderWormholeAsset(
   ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
+  x: number,
+  y: number,
   animFrame: number,
-  label: string
+  label = 'Portal',
+  color = '#8B5CF6',
+  radius = 48
 ) {
-  const pulse = Math.sin(animFrame * 0.12) * 5;
-  const spin = animFrame * 0.05;
-
   ctx.save();
-  ctx.translate(px, py);
-  ctx.scale(0.65, 0.65);
+  ctx.translate(x, y);
+  const pulse = 1 + Math.sin(animFrame * 0.08 + x) * 0.06;
+  const col = color || '#8B5CF6';
 
-  // 1. Orbiting Floating Dark Magenta Crystal Shards
-  ctx.fillStyle = '#6B21A8';
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI / 4) + spin * 0.7;
-    const dist = 52 + Math.sin(spin * 2 + i) * 4;
-    const sx = Math.cos(a) * dist;
-    const sy = Math.sin(a) * dist;
+  // Spinning outer rune aura
+  const og = ctx.createRadialGradient(0, 0, radius * 0.18, 0, 0, radius * 1.15 * pulse);
+  og.addColorStop(0, '#FFFFFF');
+  og.addColorStop(0.45, `${col}88`);
+  og.addColorStop(1, `${col}00`);
+  ctx.fillStyle = og;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 1.15 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.rotate(animFrame * 0.03);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 3.2;
+  ctx.setLineDash([12, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.78, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  drawSpriteCentered(ctx, 'crystal_rainbow', x, y, radius * 1.25 * pulse, {
+    shadow: false,
+  });
+
+  if (label) {
     ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(a + Math.PI / 2);
-    ctx.beginPath();
-    ctx.moveTo(0, -6); ctx.lineTo(4, 4); ctx.lineTo(-4, 4);
-    ctx.closePath();
-    ctx.fill();
+    ctx.font = 'bold 11px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#0b3d28';
+    ctx.fillText(label.replace(/🌀/g, '').trim() || 'Wormhole', x, y + radius * 1.1);
     ctx.restore();
   }
-
-  // 2. Outer Organic Wavy Magenta/Purple Vortex Shell
-  ctx.rotate(spin);
-  ctx.fillStyle = '#C026D3';
-  ctx.beginPath();
-  const rBase = 42 + pulse;
-  for (let a = 0; a <= Math.PI * 2; a += 0.2) {
-    const rWavy = rBase + Math.sin(a * 5 + spin * 3) * 6;
-    const vx = Math.cos(a) * rWavy;
-    const vy = Math.sin(a) * rWavy;
-    if (a === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 3. Middle Swirling Deep Purple Contour Ring
-  ctx.fillStyle = '#7E22CE';
-  ctx.beginPath();
-  const rMid = 34 + pulse * 0.6;
-  for (let a = 0; a <= Math.PI * 2; a += 0.2) {
-    const rWavy = rMid + Math.sin(-a * 4 + spin * 4) * 4;
-    const vx = Math.cos(a) * rWavy;
-    const vy = Math.sin(a) * rWavy;
-    if (a === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 4. Glowing Magenta / Pink Energy Ring Highlight
-  ctx.rotate(-spin * 2);
-  ctx.beginPath();
-  ctx.arc(0, 0, 26, 0, Math.PI * 2);
-  ctx.strokeStyle = '#F43F5E';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // 5. Swirling Cyan / Aqua Event Horizon Core
-  ctx.beginPath();
-  ctx.arc(0, 0, 20, 0, Math.PI * 2);
-  const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, 20);
-  grad.addColorStop(0, '#67E8F9');
-  grad.addColorStop(0.6, '#06B6D4');
-  grad.addColorStop(1, '#0284C7');
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // Core Spiral Vortex
-  ctx.beginPath();
-  ctx.arc(0, 0, 12, spin, spin + Math.PI * 1.5);
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  ctx.restore();
 }

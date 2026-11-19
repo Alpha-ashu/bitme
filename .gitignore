@@ -14,6 +14,8 @@ backend/dist/
 # Runtime persistence (§10 file-backed DB)
 data/
 backend/data/
+uploads/
+backend/uploads/
 
 # Environment files
 .env
@@ -23,6 +25,14 @@ backend/data/
 *.log
 npm-debug.log*
 
+# Design source binaries
+design-assets/*.eps
+
 # Mobile Binaries
 *.apk
 *.aab
+
+# Stock-art source packs (large, licensed; sprites are cut into frontend/public/assets/sprites)
+frontend/src/*/*.eps
+frontend/src/*/*.jpg
+frontend/src/vecteezy_*/

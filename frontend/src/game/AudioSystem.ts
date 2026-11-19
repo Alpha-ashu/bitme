@@ -34,6 +34,10 @@ export class AudioSystem {
     return this.isMuted;
   }
 
+  public setSfxEnabled(on: boolean): void {
+    this.isMuted = !on;
+  }
+
   public getMuted(): boolean {
     return this.isMuted;
   }
