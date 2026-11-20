@@ -353,3 +353,4 @@ function showStageModal(ctx: AppContext, levelNumber: number) {
 
   document.body.appendChild(overlay);
 }
+

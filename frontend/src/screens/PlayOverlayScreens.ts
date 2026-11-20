@@ -311,8 +311,10 @@ export function renderGameplayScreen(
        </div>`
     : '';
 
-  const boardList = (st?.leaderboard || []).slice(0, 6);
-  const leaderboardHtml = boardList.length ? `
+  const boardList = (st?.leaderboard && st.leaderboard.length > 0)
+    ? st.leaderboard.slice(0, 6)
+    : [{ id: me?.id || 'me', name: me?.displayName || state.profile?.displayName || 'Explorer', score: score || 0 }];
+  const leaderboardHtml = `
     <aside class="hud-board ${opts.leaderboardExpanded ? 'open' : 'collapsed'}" id="hud-board">
       <button class="hud-board-toggle" id="btn-board-toggle">${rankIdx > 0 ? `#${rankIdx}` : 'Top'} ▾</button>
       <div class="hud-board-rows">
@@ -324,7 +326,7 @@ export function renderGameplayScreen(
         `).join('')}
       </div>
     </aside>
-  ` : '';
+  `;
 
   const abCd = Math.ceil(me?.abilityCooldown || 0);
   const shieldSec = Math.ceil(me?.shieldTimer || 0);
@@ -355,18 +357,13 @@ export function renderGameplayScreen(
     </div>
   `;
 
-  const hudTopRight = `
-    <div class="hud-top-right-bar">
-      <button id="btn-pause" class="hud-pause-btn" aria-label="Pause Game">⏸</button>
-    </div>
-  `;
-
   root.innerHTML = `
     <div class="play-viewport">
       <canvas id="game-canvas"></canvas>
       <div class="hud-overlay">
+        ${hudTopHtml}
+        ${leaderboardHtml}
         ${hudCenterVitals}
-        ${hudTopRight}
         <div id="active-quest-hud-slot"></div>
         ${chargeBarHtml}
         <div id="npc-approach-chip-slot"></div>
@@ -601,6 +598,11 @@ export function patchGameplayHudValues(root: HTMLElement, st: GameStateTick, ctx
         <b>${fmtNum(e.score)}</b>
       </div>
     `).join('');
+  }
+  const boardToggleBtn = root.querySelector('#btn-board-toggle');
+  if (boardToggleBtn) {
+    const lbl = rankIdx > 0 ? `#${rankIdx} ▾` : 'Top ▾';
+    if (boardToggleBtn.textContent !== lbl) boardToggleBtn.textContent = lbl;
   }
 }
 
