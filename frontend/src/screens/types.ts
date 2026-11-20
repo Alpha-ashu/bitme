@@ -71,40 +71,6 @@ export const UI_MODES: Record<UIMode, UIModeDef> = {
 
 export const UI_MODE_ORDER: UIMode[] = ['explorer', 'free_roam', 'battle_royale', 'team', 'boss', 'nokia', 'event'];
 
-export interface SkinDef { id: string; name: string; grad: string; family: string; premium?: boolean; }
-export const SKIN_FAMILIES: Array<{ family: string; icon: string; skins: SkinDef[] }> = [
-  { family: 'Forest', icon: '🌳', skins: [
-    { id: 'Forest', name: 'Forest', family: 'Forest', grad: 'linear-gradient(90deg,#1B5E20,#8BC34A)' },
-    { id: 'Jungle', name: 'Jungle', family: 'Forest', grad: 'linear-gradient(90deg,#2E7D32,#81C784)' },
-  ]},
-  { family: 'Ocean', icon: '🌊', skins: [
-    { id: 'Ocean', name: 'Ocean', family: 'Ocean', grad: 'linear-gradient(90deg,#0D47A1,#64B5F6)' },
-    { id: 'Ice', name: 'Ice', family: 'Ocean', grad: 'linear-gradient(90deg,#0097A7,#E0F7FA)' },
-  ]},
-  { family: 'Fire', icon: '🔥', skins: [
-    { id: 'Fire', name: 'Fire', family: 'Fire', grad: 'linear-gradient(90deg,#C62828,#FFB74D)' },
-    { id: 'Electric', name: 'Electric', family: 'Fire', grad: 'linear-gradient(90deg,#F57F17,#FFF9C4)' },
-  ]},
-  { family: 'Mystical', icon: '🌌', skins: [
-    { id: 'Galaxy', name: 'Galaxy', family: 'Mystical', grad: 'linear-gradient(90deg,#0D0221,#E040FB)' },
-    { id: 'Shadow', name: 'Shadow', family: 'Mystical', grad: 'linear-gradient(90deg,#311B92,#9575CD)' },
-    { id: 'Mythical', name: 'Mythical', family: 'Mystical', grad: 'linear-gradient(90deg,#4A0072,#EA80FC)', premium: true },
-  ]},
-  { family: 'Elegant', icon: '👑', skins: [
-    { id: 'Golden', name: 'Golden', family: 'Elegant', grad: 'linear-gradient(90deg,#FF8F00,#FFE082)', premium: true },
-    { id: 'Royal', name: 'Royal', family: 'Elegant', grad: 'linear-gradient(90deg,#311B92,#D1C4E9)', premium: true },
-  ]},
-  { family: 'Nature', icon: '🌸', skins: [
-    { id: 'Sakura', name: 'Sakura', family: 'Nature', grad: 'linear-gradient(90deg,#AD1457,#FCE4EC)' },
-    { id: 'Desert', name: 'Desert', family: 'Nature', grad: 'linear-gradient(90deg,#8B5E0A,#F0D060)' },
-  ]},
-  { family: 'Seasonal', icon: '🎄', skins: [
-    { id: 'Christmas', name: 'Christmas', family: 'Seasonal', grad: 'linear-gradient(90deg,#C62828,#1B5E20)' },
-    { id: 'Halloween', name: 'Halloween', family: 'Seasonal', grad: 'linear-gradient(90deg,#212121,#FF6D00)' },
-  ]},
-];
-export const SKINS: SkinDef[] = SKIN_FAMILIES.flatMap(f => f.skins);
-
 export interface AccessoryDef { id: string; name: string; icon: string; slot: string; rarity: string; costStars?: number; costTickets?: number; minLevel?: number; seasonal?: boolean; owned?: boolean; equipped?: boolean; affordable?: boolean; levelMet?: boolean; }
 export const DEFAULT_ACCESSORIES: AccessoryDef[] = [
   { id: 'flower_crown', name: 'Flower Crown', icon: '🌸', slot: 'hat', rarity: 'common', costStars: 0, costTickets: 0, minLevel: 1 },
@@ -190,14 +156,13 @@ export interface AppRuntimeState {
   settings: Settings;
   selectedUIMode: UIMode;
   selectedKingdom: number;
-  selectedSkin: string;
   equippedAccessory: string;
   selectedRegion: string;
   selectedRoomId?: string;
   selectedRoomCode?: string;
   invTab: 'accessories' | 'eggs' | 'coupons';
   missionCat: 'daily' | 'weekly' | 'event' | 'achievements';
-  shopCatalog: { skins: any[]; accessories: AccessoryDef[] };
+  shopCatalog: { accessories: AccessoryDef[] };
   missions: any[];
   achievements: any[];
   rewards: any[];

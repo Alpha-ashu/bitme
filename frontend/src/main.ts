@@ -89,12 +89,11 @@ class AnacondaParkApp {
       settings,
       selectedUIMode: 'free_roam',
       selectedKingdom: 1,
-      selectedSkin: 'Forest',
       equippedAccessory: '',
       selectedRegion: 'Global',
       invTab: 'accessories',
       missionCat: 'daily',
-      shopCatalog: { skins: [], accessories: [] },
+      shopCatalog: { accessories: [] },
       missions: [],
       achievements: [],
       rewards: [],
@@ -343,7 +342,6 @@ class AnacondaParkApp {
     }
     if (data.profile) {
       this.state.profile = data.profile;
-      this.state.selectedSkin = data.profile.equippedSkin || 'Forest';
       this.state.equippedAccessory = data.profile.equippedAccessory || '';
       if (data.profile.explorer?.kingdom) {
         this.state.selectedKingdom = data.profile.explorer.kingdom;
@@ -467,7 +465,7 @@ class AnacondaParkApp {
       api('/api/events'),
       getPlayerToken() ? api('/api/player/history?limit=25') : Promise.resolve({ ok: false, data: null }),
     ]);
-    if (shop.ok) this.state.shopCatalog = { skins: shop.data.skins || [], accessories: shop.data.accessories || [] };
+    if (shop.ok) this.state.shopCatalog = { accessories: shop.data.accessories || [] };
     if (ms.ok) this.state.missions = ms.data.missions || [];
     if (ach.ok) this.state.achievements = ach.data.achievements || [];
     if (rw.ok) this.state.rewards = rw.data.items || [];
@@ -975,7 +973,7 @@ class AnacondaParkApp {
 
     this.client.connect(
       getPlayerToken() || '',
-      this.state.selectedSkin,
+      'Forest',
       mDef.backend,
       this.state.selectedRegion,
       'global',

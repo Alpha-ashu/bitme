@@ -508,7 +508,7 @@ export class Database {
       { id: 'rw_giftcard_10', title: 'Digital Gift Card (10 credits)', category: 'giftcard', icon: '🎟️', baseStarCost: 5000, regions: 'all', stock: 50, minLevel: 5, provider: 'Approved Gift Provider', description: 'Redeemable digital gift credit via an authorized provider.', enabled: true, updatedAt: now },
       { id: 'rw_giftcard_25', title: 'Digital Gift Card (25 credits)', category: 'giftcard', icon: '💳', baseStarCost: 12000, regions: ['Global', 'USA', 'Europe', 'India'], stock: 20, minLevel: 15, provider: 'Approved Gift Provider', description: 'Higher-value digital gift credit, region-gated.', enabled: true, updatedAt: now },
       { id: 'rw_merch_tee', title: 'Anaconda Park T-Shirt', category: 'merch', icon: '👕', baseStarCost: 8000, regions: ['USA', 'Europe', 'India', 'Brazil'], stock: 15, minLevel: 10, provider: 'Official Merch Partner', description: 'Physical merch — shipping where the partner operates.', enabled: true, updatedAt: now },
-      { id: 'rw_bundle_cosmetic', title: 'Legend Cosmetic Bundle', category: 'cosmetic', icon: '✨', baseStarCost: 3000, regions: 'all', stock: -1, minLevel: 1, provider: 'In-Game', description: 'A bundle of premium skins & trails, granted instantly.', enabled: true, updatedAt: now },
+      { id: 'rw_bundle_cosmetic', title: 'Legend Cosmetic Bundle', category: 'cosmetic', icon: '✨', baseStarCost: 3000, regions: 'all', stock: -1, minLevel: 1, provider: 'In-Game', description: 'A bundle of premium wearables & trails, granted instantly.', enabled: true, updatedAt: now },
       { id: 'rw_eventpass', title: 'Seasonal Event Pass', category: 'eventpass', icon: '🎫', baseStarCost: 4000, regions: 'all', stock: -1, minLevel: 3, provider: 'In-Game', description: 'Unlocks the current season event track.', enabled: true, updatedAt: now },
       { id: 'rw_partner_promo', title: 'Partner Promo Voucher', category: 'partner', icon: '🤝', baseStarCost: 2000, regions: ['India', 'Brazil'], stock: 30, minLevel: 5, provider: 'Regional Partner', description: 'A partner promotion available in select regions.', enabled: true, updatedAt: now },
     ];
@@ -941,7 +941,7 @@ export class Database {
     const updated = this.updateProfile(userId, {
       level: 1, xp: 0, prestige, tickets: profile.tickets + 10, stars: profile.stars + 5000, unlockedEvolutions: merged,
     });
-    return { success: true, message: `Prestige ${prestige} unlocked! Kept all skins & evolutions.`, profile: updated };
+    return { success: true, message: `Prestige ${prestige} unlocked! Kept all wearables & evolutions.`, profile: updated };
   }
 
   // ------------------------------------------------------------- audit & anticheat logs

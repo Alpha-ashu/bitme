@@ -11,22 +11,15 @@ interface MascotPalette {
   pattern?: 'dots' | 'stripes' | 'stars';
 }
 
-const SKIN_MASCOT_THEMES: Record<string, MascotPalette> = {
-  Forest:    { top: '#4ADE80', mid: '#16A34A', shade: '#14532D', belly: '#FEF9C3', outline: '#052E16', crest: '#FACC15', blush: '#FB7185', pattern: 'dots' },
-  Jungle:    { top: '#34D399', mid: '#059669', shade: '#064E3B', belly: '#ECFDF5', outline: '#022C22', crest: '#FDE047', blush: '#FCA5A5', pattern: 'stripes' },
-  Ocean:     { top: '#60A5FA', mid: '#2563EB', shade: '#1E3A8A', belly: '#EFF6FF', outline: '#172554', crest: '#38BDF8', blush: '#F9A8D4', pattern: 'dots' },
-  Ice:       { top: '#BAE6FD', mid: '#0EA5E9', shade: '#0369A1', belly: '#F8FAFC', outline: '#0C4A6E', crest: '#E0F2FE', blush: '#FDA4AF', pattern: 'stars' },
-  Fire:      { top: '#FB923C', mid: '#EA580C', shade: '#9A3412', belly: '#FEF3C7', outline: '#431407', crest: '#FDE047', blush: '#FB7185', pattern: 'stripes' },
-  Electric:  { top: '#FEF08A', mid: '#EAB308', shade: '#A16207', belly: '#FFFBEB', outline: '#422006', crest: '#38BDF8', blush: '#FCA5A5', pattern: 'stripes' },
-  Galaxy:    { top: '#A78BFA', mid: '#6D28D9', shade: '#3B0764', belly: '#F3E8FF', outline: '#1E1B4B', crest: '#F472B6', blush: '#F9A8D4', pattern: 'stars' },
-  Shadow:    { top: '#9333EA', mid: '#581C87', shade: '#2E1065', belly: '#E9D5FF', outline: '#0F172A', crest: '#38BDF8', blush: '#F472B6', pattern: 'stars' },
-  Mythical:  { top: '#F472B6', mid: '#DB2777', shade: '#831843', belly: '#FDF2F8', outline: '#500724', crest: '#FDE047', blush: '#FB7185', pattern: 'stars' },
-  Golden:    { top: '#FDE047', mid: '#D97706', shade: '#92400E', belly: '#FFFBEB', outline: '#451A03', crest: '#EF4444', blush: '#FCA5A5', pattern: 'stars' },
-  Royal:     { top: '#C4B5FD', mid: '#7C3AED', shade: '#4C1D95', belly: '#F5F3FF', outline: '#2E1065', crest: '#FACC15', blush: '#F472B6', pattern: 'dots' },
-  Sakura:    { top: '#F9A8D4', mid: '#EC4899', shade: '#9D174D', belly: '#FFF1F2', outline: '#500724', crest: '#FDE047', blush: '#FB7185', pattern: 'dots' },
-  Desert:    { top: '#FCD34D', mid: '#D97706', shade: '#78350F', belly: '#FEFCE8', outline: '#451A03', crest: '#FB7185', blush: '#FCA5A5', pattern: 'stripes' },
-  Christmas: { top: '#F87171', mid: '#DC2626', shade: '#991B1B', belly: '#ECFDF5', outline: '#450A0A', crest: '#22C55E', blush: '#EF4444', pattern: 'dots' },
-  Halloween: { top: '#FB923C', mid: '#C2410C', shade: '#7C2D12', belly: '#FEF3C7', outline: '#271004', crest: '#8B5CF6', blush: '#F43F5E', pattern: 'stripes' },
+const SERPENT_MASCOT_THEME: MascotPalette = {
+  top: '#4ADE80',
+  mid: '#16A34A',
+  shade: '#14532D',
+  belly: '#FEF9C3',
+  outline: '#052E16',
+  crest: '#FACC15',
+  blush: '#FB7185',
+  pattern: 'dots',
 };
 
 let svgUid = 0;
@@ -64,7 +57,7 @@ export function svgAccessoryOverlay(accId?: string): string {
 
 /** Expressive Emerald Cartoon Serpent Mascot (supports accessory & evolution tiers). */
 export function svgSnakePreview(_skinId = 'Forest', accessoryId?: string, size = 84, evolution?: string): string {
-  const pal = SKIN_MASCOT_THEMES.Forest;
+  const pal = SERPENT_MASCOT_THEME;
   const uid = `cq_${++svgUid}`;
   const pat = pal.pattern === 'stars'
     ? `<circle cx="24" cy="64" r="2.2" fill="${pal.crest}"/><circle cx="71" cy="68" r="2.4" fill="${pal.crest}"/><circle cx="58" cy="30" r="2" fill="${pal.crest}"/>`

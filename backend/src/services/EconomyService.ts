@@ -206,11 +206,7 @@ export class EconomyService {
     } else {
       stars = 750 + Math.floor(Math.random() * 500);
       tickets = 5;
-      if (lockedSkins.length > 0) {
-        const pick = lockedSkins[Math.floor(Math.random() * lockedSkins.length)];
-        unlockedSkin = pick.id;
-        ownedSkins.add(pick.id);
-      } else if (lockedAccs.length > 0) {
+      if (lockedAccs.length > 0) {
         const pick = lockedAccs[Math.floor(Math.random() * lockedAccs.length)];
         unlockedAccessory = pick.id;
         ownedAcc.add(pick.id);

@@ -300,8 +300,8 @@ const DEFAULTS: GameConfig = {
   events: [
     { id: 'evt_jungle_festival', icon: '🐍', name: 'Jungle Festival',    description: 'Double stars from every collectible all weekend.', months: [], rewardHint: '2× Stars' },
     { id: 'evt_monsoon',         icon: '🌧️', name: 'Monsoon Rush',        description: 'Frog & star spawns tripled across the reserve.',   months: [6, 7, 8], rewardHint: '3× Frogs & Stars' },
-    { id: 'evt_halloween',       icon: '🎃', name: 'Halloween Hunt',      description: 'Pumpkin skins, spooky map tint and night hazards.', months: [10], rewardHint: 'Halloween skin' },
-    { id: 'evt_winter',          icon: '🎄', name: 'Winter Wonderland',   description: 'Snow map, gift chests and festive accessories.',    months: [12], rewardHint: 'Christmas skin' },
+    { id: 'evt_halloween',       icon: '🎃', name: 'Halloween Hunt',      description: 'Spooky map tint, pumpkin treats and night hazards.', months: [10], rewardHint: 'Halloween Treats' },
+    { id: 'evt_winter',          icon: '🎄', name: 'Winter Wonderland',   description: 'Snow map, gift chests and festive accessories.',    months: [12], rewardHint: 'Winter Wearable' },
     { id: 'evt_newyear',         icon: '🎆', name: 'New Year Fireworks',  description: 'Bonus XP on every match to start the year strong.',  months: [1], rewardHint: '2× XP' },
     { id: 'evt_spring_bloom',    icon: '🌸', name: 'Spring Bloom',        description: 'Sakura trails and flower-crown drops in the park.',  months: [3, 4], rewardHint: 'Flower Crown' },
   ],

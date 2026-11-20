@@ -13,7 +13,7 @@ import {
   svgTrophyMedallion,
 } from '../components/CartoonUi';
 import { esc } from '../utils/escapeHtml';
-import { AppContext, DEFAULT_ACCESSORIES, getViewportTier, SKIN_FAMILIES } from './types';
+import { AppContext, DEFAULT_ACCESSORIES, getViewportTier } from './types';
 
 function stripLeadEmoji(raw: string): string {
   return String(raw || '').replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F\u200D\s]+/gu, '').trim() || String(raw || '');
@@ -42,15 +42,13 @@ function showShopInspectModal(
 
   const draw = () => {
     const card = cards[idx];
-    const kind = card.dataset.inspectKind as 'skin' | 'acc' | 'egg';
+    const kind = card.dataset.inspectKind as 'acc' | 'egg';
     const id = card.dataset.inspectId!;
     const title = card.dataset.inspectTitle || 'Item';
     const subtitle = card.dataset.inspectSub || '';
-    const visualHtml = kind === 'skin'
-      ? svgSnakePreview(id, ctx.state.equippedAccessory, 108)
-      : kind === 'acc'
-        ? svgAccessoryPreview(id, 92)
-        : svgFoodPreview(id, 88);
+    const visualHtml = kind === 'acc'
+      ? svgAccessoryPreview(id, 92)
+      : svgFoodPreview(id, 88);
     const act = card.querySelector('button, .pill-live')?.outerHTML || '';
 
     overlay.innerHTML = `
@@ -132,10 +130,8 @@ export function renderInventoryPage(ctx: AppContext): string {
   const { state } = ctx;
   const tier = getViewportTier();
   const p = state.profile || {};
-  const ownedSkins = new Set<string>(p.unlockedSkins || ['Forest', 'Jungle']);
   const ownedAcc = new Set<string>(p.unlockedAccessories || ['flower_crown']);
   const inv = p.inventory || {};
-  const catalogSkins: any[] = state.shopCatalog?.skins || [];
   const catalogAcc: any[] = state.shopCatalog?.accessories?.length ? state.shopCatalog.accessories : DEFAULT_ACCESSORIES;
 
   const tabs = [

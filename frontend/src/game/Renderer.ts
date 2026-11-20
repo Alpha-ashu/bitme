@@ -32,7 +32,7 @@ import {
 } from './assets/index.js';
 import { preloadCoreBundleSprites } from './assets/spriteCache.js';
 
-interface SkinPalette {
+interface SerpentPalette {
   primary: string;
   secondary: string;
   belly: string;
@@ -44,27 +44,16 @@ interface SkinPalette {
   accentColor: string;
 }
 
-const SKINS: Record<string, SkinPalette> = {
-  Forest:   { primary: '#F2F9F6', secondary: '#B5EAD7', belly: '#C7E9DE', glow: '#D8F3DC', eye: '#1B243B', blush: '#FFB7B2', outline: '#233240', scaleColor: 'rgba(112, 193, 179, 0.4)', accentColor: '#F472B6' },
-  Ocean:    { primary: '#F0F8FF', secondary: '#BEE3F8', belly: '#D0E4F2', glow: '#E0F2FE', eye: '#1B243B', blush: '#FFB7CE', outline: '#1F2D42', scaleColor: 'rgba(144, 205, 244, 0.45)', accentColor: '#38BDF8' },
-  Fire:     { primary: '#FFF8F5', secondary: '#FFDAC1', belly: '#FCE1D4', glow: '#FFE5D9', eye: '#2D1B24', blush: '#FF9AA2', outline: '#3D1E28', scaleColor: 'rgba(255, 183, 178, 0.45)', accentColor: '#F97316' },
-  Ice:      { primary: '#F5FCFF', secondary: '#E2F1FF', belly: '#D4EBFC', glow: '#EDF2F7', eye: '#162235', blush: '#FEB2B2', outline: '#1C2C42', scaleColor: 'rgba(190, 227, 248, 0.45)', accentColor: '#BAE6FD' },
-  Sakura:   { primary: '#FFF5F8', secondary: '#FFC6FF', belly: '#FCDDEC', glow: '#FFE5EC', eye: '#331B28', blush: '#FF70A6', outline: '#421E32', scaleColor: 'rgba(255, 173, 173, 0.45)', accentColor: '#EC4899' },
-  Shadow:   { primary: '#F9F5FF', secondary: '#D8B4FE', belly: '#E9D5FF', glow: '#F5D0FE', eye: '#1E1035', blush: '#F472B6', outline: '#2D184C', scaleColor: 'rgba(192, 132, 252, 0.4)', accentColor: '#A855F7' },
-  Galaxy:   { primary: '#F4F5FB', secondary: '#C7CEEA', belly: '#D8DCF2', glow: '#E8DFF5', eye: '#161936', blush: '#FFC6FF', outline: '#22274C', scaleColor: 'rgba(181, 234, 215, 0.4)', accentColor: '#818CF8' },
-  Golden:   { primary: '#FFFFF5', secondary: '#FFFFD1', belly: '#FAF3C0', glow: '#FFF9C4', eye: '#35280F', blush: '#FFB7B2', outline: '#4A3918', scaleColor: 'rgba(255, 229, 153, 0.45)', accentColor: '#FACC15' },
-  Royal:    { primary: '#F8F6FF', secondary: '#DDD6FE', belly: '#E5DEF9', glow: '#EDE9FE', eye: '#201642', blush: '#F472B6', outline: '#312361', scaleColor: 'rgba(167, 139, 250, 0.4)', accentColor: '#C084FC' },
-  Desert:   { primary: '#FFFDF5', secondary: '#FDE68A', belly: '#F7E7A9', glow: '#FEF08A', eye: '#38230B', blush: '#FCA5A5', outline: '#4A3113', scaleColor: 'rgba(252, 211, 77, 0.45)', accentColor: '#F59E0B' },
-  Jungle:   { primary: '#F3FBF7', secondary: '#A7F3D0', belly: '#C6F6D5', glow: '#D1FAE5', eye: '#103022', blush: '#FCA5A5', outline: '#194532', scaleColor: 'rgba(110, 231, 183, 0.45)', accentColor: '#10B981' },
-  Electric: { primary: '#FFFFF2', secondary: '#FEF08A', belly: '#FAF0A3', glow: '#FEF08A', eye: '#382B08', blush: '#FCA5A5', outline: '#4D3B0E', scaleColor: 'rgba(253, 224, 71, 0.45)', accentColor: '#EAB308' },
-  Christmas:{ primary: '#FFF5F5', secondary: '#FCA5A5', belly: '#FAD1D1', glow: '#FEE2E2', eye: '#281717', blush: '#EF4444', outline: '#421E1E', scaleColor: 'rgba(110, 231, 183, 0.45)', accentColor: '#EF4444' },
-  Halloween:{ primary: '#FFF8F2', secondary: '#FDBA74', belly: '#FCD7B0', glow: '#FED7AA', eye: '#261810', blush: '#F43F5E', outline: '#40261A', scaleColor: 'rgba(251, 146, 60, 0.45)', accentColor: '#F97316' },
-  Mythical: { primary: '#FFF2FA', secondary: '#F472B6', belly: '#F9CEE7', glow: '#FCE7F3', eye: '#380E24', blush: '#FB7185', outline: '#4F1836', scaleColor: 'rgba(232, 121, 249, 0.45)', accentColor: '#EC4899' },
-};
-
-const SKIN_ALIASES: Record<string, string> = {
-  'Emerald Anaconda': 'Forest', 'Standard Forest Snake': 'Forest', 'Golden Serpent': 'Golden',
-  'Crimson Viper': 'Fire', 'Shadow Cobra': 'Shadow', 'Ice': 'Ice', 'Galaxy': 'Galaxy',
+const SERPENT_PALETTE: SerpentPalette = {
+  primary: '#F2F9F6',
+  secondary: '#B5EAD7',
+  belly: '#C7E9DE',
+  glow: '#D8F3DC',
+  eye: '#1B243B',
+  blush: '#FFB7B2',
+  outline: '#233240',
+  scaleColor: 'rgba(112, 193, 179, 0.4)',
+  accentColor: '#F472B6',
 };
 
 interface InterpolatedSnake {
@@ -237,8 +226,8 @@ export class Renderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  private palette(_skin?: string): SkinPalette {
-    return SKINS.Forest;
+  private palette(): SerpentPalette {
+    return SERPENT_PALETTE;
   }
 
   private getAnimState(id: string) {
@@ -708,7 +697,7 @@ export class Renderer {
    */
   private renderKawaiiVectorSnake(snake: SnakeData, isTarget: boolean) {
     const ctx = this.ctx;
-    const pal = this.palette(snake.skin);
+    const pal = this.palette();
     const lerp = this.lerpSnakes.get(snake.id);
     const rawHeadX = lerp ? lerp.x : snake.head.x;
     const rawHeadY = lerp ? lerp.y : snake.head.y;
