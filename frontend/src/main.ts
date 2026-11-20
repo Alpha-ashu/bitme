@@ -1,6 +1,6 @@
 import './style.css';
 import { api, getPlayerToken, setPlayerToken } from './api/ApiClient';
-import { applyPowerConfig, GameClient, GameStateTick, hasConfiguredServer } from './game/GameClient';
+import { applyPowerConfig, GameClient, GameStateTick, hasConfiguredServer, HeartStateData } from './game/GameClient';
 import { Renderer } from './game/Renderer';
 import { audio } from './game/AudioSystem';
 import * as story from './game/story';
@@ -15,6 +15,7 @@ import { renderAppShell } from './screens/CoreMenuScreens';
 import {
   patchActiveQuestHud,
   patchGameplayHudValues,
+  patchHeartHudBar,
   patchNpcApproachChip,
   patchNpcEncounterOverlay,
   patchQuizOverlay,
@@ -101,6 +102,15 @@ class AnacondaParkApp {
       explorer: null,
       adventure: null,
       rewardBox: { items: [], unclaimedCount: 0, totals: { stars: 0, xp: 0, evoXp: 0, tickets: 0 }, powerups: [] },
+      heartState: {
+        hearts: 5,
+        maxHearts: 5,
+        heartShards: 0,
+        shardsRequired: 30,
+        restoreIntervalSec: 900,
+        nextRestoreInSec: 0,
+        nextRestoreAtMs: 0,
+      },
       npcQuotas: {},
       activeQuest: null,
       activeNpcEncounter: null,
@@ -137,6 +147,9 @@ class AnacondaParkApp {
       refreshExplorer: () => this.refreshExplorer(),
       refreshAdventure: (opts) => this.refreshAdventure(opts),
       refreshRewardBox: () => this.refreshRewardBox(),
+      refreshHearts: () => this.refreshHearts(),
+      getLiveHeartState: () => this.getLiveHeartState(),
+      setQuizActive: (active) => this.setQuizActive(active),
       usePowerup: (pid) => this.usePowerup(pid),
       getZoomLabel: () => this.renderer?.getZoomLabel() || '1.0×',
       startAdventureLevel: (lvl) => this.startAdventureLevel(lvl),
@@ -167,6 +180,7 @@ class AnacondaParkApp {
         {
           onTogglePause: (paused) => this.client.setMapPlanning(paused),
           npcQuotas: this.state.npcQuotas,
+          activeQuest: this.state.activeQuest,
         }
       ),
       openAuthModal: (tab) => showPlayerAuthModal(this.ctx, tab),
@@ -335,6 +349,102 @@ class AnacondaParkApp {
         this.state.selectedKingdom = data.profile.explorer.kingdom;
       }
     }
+    if (data?.heartState) {
+      this.applyHeartState(data.heartState);
+    }
+  }
+
+  private applyHeartState(hs: Partial<HeartStateData>) {
+    const maxHearts = Math.max(1, Number(hs.maxHearts) || 5);
+    const hearts = Math.max(0, Math.min(maxHearts, hs.hearts ?? this.state.heartState.hearts));
+    const restoreIntervalSec = Math.max(60, Number(hs.restoreIntervalSec) || 900);
+    const nextRestoreInSec = hearts < maxHearts ? Math.max(0, Number(hs.nextRestoreInSec) || 0) : 0;
+    const nextRestoreAtMs = hearts < maxHearts && nextRestoreInSec > 0
+      ? Date.now() + nextRestoreInSec * 1000
+      : 0;
+    this.state.heartState = {
+      hearts,
+      maxHearts,
+      heartShards: Math.max(0, Number(hs.heartShards) || 0),
+      shardsRequired: Math.max(1, Number(hs.shardsRequired) || 30),
+      restoreIntervalSec,
+      nextRestoreInSec,
+      nextRestoreAtMs,
+    };
+    if (this.state.screen === 'play') {
+      patchHeartHudBar(this.root, this.ctx);
+    }
+  }
+
+  public getLiveHeartState(): HeartStateData {
+    const cur = this.state.heartState;
+    if (cur.hearts >= cur.maxHearts) {
+      return { ...cur, nextRestoreInSec: 0, nextRestoreAtMs: 0 };
+    }
+    const now = Date.now();
+    const intervalMs = (cur.restoreIntervalSec || 900) * 1000;
+    if (cur.nextRestoreAtMs > 0 && now >= cur.nextRestoreAtMs) {
+      const gained = 1 + Math.floor((now - cur.nextRestoreAtMs) / intervalMs);
+      const nextHearts = Math.min(cur.maxHearts, cur.hearts + gained);
+      const nextAt = nextHearts >= cur.maxHearts ? 0 : cur.nextRestoreAtMs + gained * intervalMs;
+      this.state.heartState = {
+        ...cur,
+        hearts: nextHearts,
+        nextRestoreAtMs: nextAt,
+        nextRestoreInSec: nextAt > now ? Math.max(1, Math.ceil((nextAt - now) / 1000)) : 0,
+      };
+      if (getPlayerToken()) void this.refreshHearts();
+      return this.state.heartState;
+    }
+    const remSec = cur.nextRestoreAtMs > now
+      ? Math.max(1, Math.ceil((cur.nextRestoreAtMs - now) / 1000))
+      : cur.nextRestoreInSec;
+    return { ...cur, nextRestoreInSec: remSec };
+  }
+
+  public async refreshHearts() {
+    if (!getPlayerToken()) return;
+    const r = await api('/api/player/hearts');
+    if (r.ok && r.data?.heartState) {
+      this.applyHeartState(r.data.heartState);
+    }
+  }
+
+  public setQuizActive(active: boolean) {
+    this.client.setQuizMode(active);
+  }
+
+  private collectLocalHeartShard() {
+    const hs = this.getLiveHeartState();
+    let hearts = hs.hearts;
+    let shards = hs.heartShards + 1;
+    let recharged = 0;
+    while (shards >= hs.shardsRequired && hearts < hs.maxHearts) {
+      shards -= hs.shardsRequired;
+      hearts += 1;
+      recharged += 1;
+    }
+    if (hearts >= hs.maxHearts) {
+      shards = Math.min(shards, hs.shardsRequired - 1);
+    }
+    this.applyHeartState({
+      ...hs,
+      hearts,
+      heartShards: shards,
+      nextRestoreInSec: hearts < hs.maxHearts ? (hs.nextRestoreInSec || hs.restoreIntervalSec) : 0,
+    });
+    const me = this.state.lastSnake;
+    if (recharged > 0) {
+      this.toast('+1 ♥ Heart Recharged (30/30 Hearts collected)!', 3000);
+      if (me) this.renderer?.spawnFeedback(me.head.x, me.head.y, '+1 ♥ RECHARGED!', '#E11D48');
+    } else if (me) {
+      this.renderer?.spawnFeedback(me.head.x, me.head.y, `♥ ${shards}/${hs.shardsRequired}`, '#FB7185');
+    }
+    if (getPlayerToken()) {
+      void api('/api/player/hearts/collect', { method: 'POST', body: JSON.stringify({ count: 1 }) }).then(r => {
+        if (r.ok && r.data?.heartState) this.applyHeartState(r.data.heartState);
+      });
+    }
   }
 
   public async refreshProfile() {
@@ -464,18 +574,19 @@ class AnacondaParkApp {
     this.state.activeQuest = r.data.session || null;
     this.state.activeNpcEncounter = null;
     this.state.activeQuizQuestion = r.data.quizQuestion || null;
+    if (r.data.heartState) this.applyHeartState(r.data.heartState);
     if (r.data.overview) this.state.adventure = { ...r.data.overview, activeQuest: this.state.activeQuest };
     this.renderer?.setActiveQuest(this.state.activeQuest);
 
     if (this.state.screen !== 'play') {
-      this.startMatch({ mode: 'explorer', kingdom: worldNum });
+      this.startMatch({ mode: 'explorer', kingdom: worldNum, preserveQuiz: Boolean(this.state.activeQuizQuestion) });
     } else {
       patchActiveQuestHud(this.root, this.ctx);
       patchNpcEncounterOverlay(this.root, this.ctx);
       patchQuizOverlay(this.root, this.ctx);
     }
     if (this.state.activeQuizQuestion) {
-      this.client.notifyPause(true);
+      this.setQuizActive(true);
     }
   }
 
@@ -562,12 +673,17 @@ class AnacondaParkApp {
     this.state.activeNpcEncounter = null;
     this.state.activeQuest = r.data.session || null;
     this.state.activeQuizQuestion = r.data.quizQuestion || null;
+    if (r.data.heartState) this.applyHeartState(r.data.heartState);
     if (r.data.npcQuotas) {
       this.state.npcQuotas = r.data.npcQuotas;
       this.renderer?.setNpcQuotas(this.state.npcQuotas);
     }
     this.renderer?.setActiveQuest(this.state.activeQuest);
-    if (!this.state.activeQuizQuestion) this.client.endInteraction();
+    if (this.state.activeQuizQuestion) {
+      this.setQuizActive(true);
+    } else {
+      this.client.endInteraction();
+    }
     this.toast(r.data.deployedTo?.ok
       ? `Quest Active! Deployed to Fresh Safe Area (4.5s Shield)`
       : `Quest Active: ${this.state.activeQuest?.title || 'Adventure'}`, 3200);
@@ -586,6 +702,12 @@ class AnacondaParkApp {
       body: JSON.stringify({ quizSessionId, questionId, answer, responseMs }),
     });
     if (!r.ok) return { ok: false, error: r.data?.error || 'Answer rejected' };
+    if (r.data?.heartState) {
+      this.applyHeartState(r.data.heartState);
+    }
+    if (r.data?.heartDeducted) {
+      this.toast('Wrong answer! −1 ♥ (Restores in 15m or collect 30 ♥ in park)', 3600);
+    }
     if (r.data?.questUpdate) {
       const qu = r.data.questUpdate;
       if (qu.autoClaimedToBox) {
@@ -609,11 +731,13 @@ class AnacondaParkApp {
 
   public closeQuizModal() {
     this.state.activeQuizQuestion = null;
+    this.setQuizActive(false);
     this.client.endInteraction();
     if (this.state.screen === 'play') {
       patchQuizOverlay(this.root, this.ctx);
       patchActiveQuestHud(this.root, this.ctx);
       patchNpcApproachChip(this.root, this.ctx);
+      patchHeartHudBar(this.root, this.ctx);
     }
   }
 
@@ -689,7 +813,7 @@ class AnacondaParkApp {
     this.render();
   }
 
-  public startMatch(opts?: { mode?: UIMode; roomId?: string; roomCode?: string; kingdom?: number }) {
+  public startMatch(opts?: { mode?: UIMode; roomId?: string; roomCode?: string; kingdom?: number; preserveQuiz?: boolean }) {
     if (opts?.mode) this.state.selectedUIMode = opts.mode;
     if (opts?.kingdom) this.state.selectedKingdom = opts.kingdom;
     this.state.selectedRoomId = opts?.roomId;
@@ -701,6 +825,10 @@ class AnacondaParkApp {
     this.state.lastSnake = null;
     this.state.summary = null;
     this.state.lastBossWin = null;
+    this.state.activeNpcEncounter = null;
+    this.state.nearbyNpcId = null;
+    if (!opts?.preserveQuiz) this.state.activeQuizQuestion = null;
+    document.getElementById('tactical-overlay')?.remove();
     this.state.adRewardClaimedThisMatch = false;
     this.state.matchStats = {};
     this.lastAlive = true;
@@ -730,7 +858,15 @@ class AnacondaParkApp {
     this.client.onCollect = (type) => {
       this.offlineQueue[type] = (this.offlineQueue[type] || 0) + 1;
       this.recordMatchPickup(type);
+      if (type === 'heart') this.collectLocalHeartShard();
       audio.playEat();
+    };
+    this.client.onHeartState = (payload) => {
+      if (payload?.heartState) this.applyHeartState(payload.heartState);
+      if ((payload?.rechargedCount || 0) > 0) {
+        this.toast(`+${payload.rechargedCount} ♥ Heart Recharged (30/30 Hearts collected)!`, 3400);
+        audio.playEat();
+      }
     };
     this.client.onPickupEvent = (ev: any) => {
       if (ev?.foodType) {
@@ -797,6 +933,7 @@ class AnacondaParkApp {
       }
       if (upd?.nextQuiz) {
         this.state.activeQuizQuestion = upd.nextQuiz;
+        this.setQuizActive(true);
       }
       if (this.state.screen === 'play') {
         patchActiveQuestHud(this.root, this.ctx);
@@ -804,7 +941,10 @@ class AnacondaParkApp {
         if (upd?.nextQuiz) patchQuizOverlay(this.root, this.ctx);
       }
     };
-    this.client.onAuthQuestSync = ({ activeQuest, activeQuiz, npcQuotas }) => {
+    this.client.onAuthQuestSync = ({ activeQuest, activeQuiz, npcQuotas, heartState }) => {
+      if (heartState) {
+        this.applyHeartState(heartState);
+      }
       if (npcQuotas) {
         this.state.npcQuotas = npcQuotas;
         this.renderer?.setNpcQuotas(npcQuotas);
@@ -816,10 +956,14 @@ class AnacondaParkApp {
       if (activeQuiz && !this.state.activeQuizQuestion) {
         this.state.activeQuizQuestion = activeQuiz;
       }
+      if (this.state.activeQuizQuestion) {
+        this.setQuizActive(true);
+      }
       if (this.state.screen === 'play') {
         patchActiveQuestHud(this.root, this.ctx);
         patchNpcApproachChip(this.root, this.ctx);
-        if (activeQuiz) patchQuizOverlay(this.root, this.ctx);
+        patchHeartHudBar(this.root, this.ctx);
+        if (this.state.activeQuizQuestion) patchQuizOverlay(this.root, this.ctx);
       }
     };
 
@@ -951,6 +1095,10 @@ class AnacondaParkApp {
   public async abandonMatch() {
     this.stopGameLoopAndInput();
     this.client.disconnect();
+    this.state.activeNpcEncounter = null;
+    this.state.nearbyNpcId = null;
+    this.state.activeQuizQuestion = null;
+    document.getElementById('tactical-overlay')?.remove();
     const dur = Math.max(1, Math.round((Date.now() - this.state.matchStartTs) / 1000));
     if (getPlayerToken() || hasConfiguredServer()) {
       await api('/api/match/abandon', {
@@ -969,6 +1117,10 @@ class AnacondaParkApp {
   private async endMatch(isVictory: boolean) {
     this.stopGameLoopAndInput();
     this.client.disconnect();
+    this.state.activeNpcEncounter = null;
+    this.state.nearbyNpcId = null;
+    this.state.activeQuizQuestion = null;
+    document.getElementById('tactical-overlay')?.remove();
 
     if (Object.keys(this.offlineQueue).length && getPlayerToken()) {
       await api('/api/progress/sync', { method: 'POST', body: JSON.stringify({ progress: this.offlineQueue }) });

@@ -14,6 +14,7 @@ import {
   NpcEncounterPayload,
   QuestSessionView,
   QuizQuestionClient,
+  HeartState,
 } from '../types';
 import { db } from '../db/Database';
 import { antiCheat } from './AntiCheatService';
@@ -23,6 +24,7 @@ import { gameConfig } from '../config/GameConfig';
 import { NPCInteractionService } from './NPCInteractionService';
 import { QuestEngineService } from './QuestEngineService';
 import { TeamObjectiveService } from './TeamObjectiveService';
+import { HeartService } from './HeartService';
 
 interface CollectibleTemplate {
   type: CollectibleType;
@@ -43,6 +45,7 @@ const COLLECTIBLE_TABLE: CollectibleTemplate[] = [
   { type: 'frog', icon: '💎', value: 30, color: '#10B981', weight: 14 },
   { type: 'crystal', icon: '🔷', value: 40, color: '#38BDF8', weight: 8, hpRestore: 6 },
   // ⭐ stars are NOT spawned here — they are a dedicated set of moving collectibles (§3)
+  { type: 'heart', icon: '❤️', value: 15, color: '#EF4444', weight: 14, hpRestore: 10 },
   { type: 'shield', icon: '💚', value: 20, color: '#3E92CC', weight: 5, hpRestore: 10, buff: 'shield', buffDuration: 8 },
   { type: 'speed', icon: '⚡', value: 20, color: '#FFD23F', weight: 5, buff: 'speed', buffDuration: 6 },
   { type: 'egg', icon: '💎', value: 500, color: '#F4E9CD', weight: 2, hpRestore: 25 },
@@ -199,7 +202,7 @@ export class GameSessionService {
       leaderboard: [],
       teamScores: this.config.teamsEnabled ? { red: 0, blue: 0 } : undefined,
       currentEvent: this.config.worldEvents ? this.availableEvents[0] : undefined,
-      matchTimer: this.isTimedMode() ? this.MATCH_SECONDS : undefined,
+      matchTimer: this.isTimedMode() ? (this.config.matchDurationSeconds ?? this.MATCH_SECONDS) : undefined,
       matchOver: this.isTimedMode() ? false : undefined,
       round: this.isTimedMode() ? 1 : undefined,
     };
@@ -207,6 +210,7 @@ export class GameSessionService {
 
     this.spawnInitialCollectibles(gameConfig.world.foodCount); // §12 config-driven
     this.spawnMovingStars(this.STAR_TARGET); // §3
+    this.spawnHeartPickups(24); // Heart recharge collectibles (30 collected = +1 full heart)
     this.spawnObstacles(); // §2
     this.spawnWormholes(); // §7 four linked wormholes
     this.spawnNpcs();      // §explorer villagers, elders, guards
@@ -427,7 +431,7 @@ export class GameSessionService {
 
   public handlePlayerInput(userId: string, angle: number, boosting: boolean, _seq: number): void {
     const snake = this.state.snakes[userId];
-    if (!snake || !snake.isAlive || snake.isPaused || snake.inInteraction) return;
+    if (!snake || !snake.isAlive || snake.isPaused || snake.inInteraction || snake.inQuiz || snake.isInvisible) return;
     // §17 Never trust client data — reject malformed input (NaN / Infinity angle injection).
     if (typeof angle !== 'number' || !Number.isFinite(angle)) return;
     if (!antiCheat.validatePacketFrequency(userId)) return;
@@ -487,7 +491,13 @@ export class GameSessionService {
         snake.isPaused = false;
         snake.mapPlanningStartedAt = undefined;
       }
-      if (!snake.isAlive || snake.isPaused || snake.inInteraction || snake.isMapPlanning) continue; // solo/adventure pause, map planning, or active NPC/quiz freeze
+      if (snake.inQuiz && snake.quizStartedAt && nowWallMs - snake.quizStartedAt > 300_000) {
+        snake.inQuiz = false;
+        snake.isInvisible = false;
+        snake.inInteraction = false;
+        snake.quizStartedAt = undefined;
+      }
+      if (!snake.isAlive || snake.isPaused || snake.inInteraction || snake.isMapPlanning || snake.inQuiz || snake.isInvisible) continue; // solo/adventure pause, map planning, or active NPC/quiz invisibility freeze
       this.updateSnake(snake, dt);
     }
 
@@ -536,6 +546,9 @@ export class GameSessionService {
           if (qRes.feedback) this.onWorldFeedbackCallback?.(s.userId, s.head.x, s.head.y, qRes.feedback, '#059669');
           if (qRes.nextQuiz) {
             s.inInteraction = true;
+            s.inQuiz = true;
+            s.isInvisible = true;
+            s.quizStartedAt = Date.now();
             s.boosting = false;
           }
           this.onQuestUpdateCallback?.(s.userId, qRes);
@@ -833,9 +846,9 @@ export class GameSessionService {
     return (dx * dx + dy * dy) < (s.radius * s.radius);
   }
 
-  // Defense-aware damage. Shield or Safe Sanctuary fully negates.
+  // Defense-aware damage. Shield, Safe Sanctuary, or Quiz Invisibility fully negates.
   private damageSnake(snake: SnakeState, amount: number, reason: string) {
-    if (snake.shieldTimer > 0 || (snake.superTimer ?? 0) > 0 || this.isInsideSanctuary(snake)) return;
+    if (snake.shieldTimer > 0 || (snake.superTimer ?? 0) > 0 || snake.inQuiz || snake.isInvisible || this.isInsideSanctuary(snake)) return;
     const reduced = amount * (1 - snake.defense / 100);
     snake.hp = Math.max(0, snake.hp - reduced);
     if (snake.hp <= 0) this.killSnake(snake, reason);
@@ -844,7 +857,7 @@ export class GameSessionService {
   private resolveFoodPickups() {
     for (const snakeId in this.state.snakes) {
       const snake = this.state.snakes[snakeId];
-      if (!snake.isAlive || snake.isPaused) continue;
+      if (!snake.isAlive || snake.isPaused || snake.inQuiz || snake.isInvisible || snake.isMapPlanning) continue;
 
       for (const foodId in this.state.food) {
         const food = this.state.food[foodId];
@@ -893,9 +906,14 @@ export class GameSessionService {
   }
 
   private onPickupCallback?: (userId: string, foodId: string, foodType: string, updatedMissions: any[]) => void;
+  private onHeartUpdateCallback?: (userId: string, heartState: HeartState, rechargedCount: number) => void;
 
   public setOnPickupCallback(cb: (userId: string, foodId: string, foodType: string, updatedMissions: any[]) => void) {
     this.onPickupCallback = cb;
+  }
+
+  public setOnHeartUpdateCallback(cb: (userId: string, heartState: HeartState, rechargedCount: number) => void) {
+    this.onHeartUpdateCallback = cb;
   }
 
   private applyFood(snake: SnakeState, food: FoodItem) {
@@ -923,6 +941,15 @@ export class GameSessionService {
       if (food.type === 'star' || food.type === 'super_star') {
         if (db.getProfile(u)) db.grantRewards(u, { stars: food.type === 'super_star' ? 3 : 1 });
       }
+      if (food.type === 'heart') {
+        const hr = HeartService.collectHeartPickup(u, 1);
+        this.onHeartUpdateCallback?.(u, hr.state, hr.rechargedCount);
+        if (hr.rechargedCount > 0) {
+          this.onWorldFeedbackCallback?.(u, food.x, food.y, '+1 ♥ RECHARGED!', '#E11D48');
+        } else {
+          this.onWorldFeedbackCallback?.(u, food.x, food.y, `♥ ${hr.state.heartShards}/${hr.state.shardsRequired}`, '#FB7185');
+        }
+      }
       if (food.type === 'egg' || food.type === 'coupon_box') db.incrementCollectible(u, 'treasure');
       if (food.buff) db.incrementCollectible(u, 'powerup');
       if (food.hpRestore && wasHurt) db.incrementCollectible(u, 'heal');
@@ -932,6 +959,9 @@ export class GameSessionService {
         if (qRes) {
           if (qRes.nextQuiz) {
             snake.inInteraction = true;
+            snake.inQuiz = true;
+            snake.isInvisible = true;
+            snake.quizStartedAt = Date.now();
             snake.boosting = false;
           }
           this.onQuestUpdateCallback?.(u, qRes);
@@ -978,12 +1008,12 @@ export class GameSessionService {
     const ids = Object.keys(this.state.snakes);
     for (let i = 0; i < ids.length; i++) {
       const a = this.state.snakes[ids[i]];
-      if (!a || !a.isAlive || a.isPaused || a.inInteraction) continue;
+      if (!a || !a.isAlive || a.isPaused || a.inInteraction || a.inQuiz || a.isInvisible) continue;
 
       // Pair each snake with each other snake exactly once (j starts at i + 1).
       for (let j = i + 1; j < ids.length; j++) {
         const b = this.state.snakes[ids[j]];
-        if (!b || !b.isAlive || b.isPaused || b.inInteraction) continue;
+        if (!b || !b.isAlive || b.isPaused || b.inInteraction || b.inQuiz || b.isInvisible) continue;
         if (this.config.teamsEnabled && a.team && a.team === b.team) continue; // no friendly fire
 
         // Heads must actually be touching — this is the ONLY collision that matters (toroidal).
@@ -1188,7 +1218,7 @@ export class GameSessionService {
       // Hunt weaker snakes when they are close (never chase paused/planning/NPC-interacting players)
       for (const id in this.state.snakes) {
         const other = this.state.snakes[id];
-        if (id === snake.id || !other.isAlive || other.isPaused || other.inInteraction || other.isMapPlanning) continue;
+        if (id === snake.id || !other.isAlive || other.isPaused || other.inInteraction || other.isMapPlanning || other.inQuiz || other.isInvisible) continue;
         if (other.score < snake.score * 0.7) {
           const dx = this.wrapDelta(other.head.x - snake.head.x);
           const dy = this.wrapDelta(other.head.y - snake.head.y);
@@ -1263,7 +1293,26 @@ export class GameSessionService {
   }
 
   private maintainCollectibles() {
-    if (Object.keys(this.state.food).length < 150) this.spawnInitialCollectibles(12);
+    const foods = Object.values(this.state.food);
+    if (foods.length < 150) this.spawnInitialCollectibles(12);
+    const heartCount = foods.filter(f => f.type === 'heart').length;
+    if (heartCount < 24) this.spawnHeartPickups(24 - heartCount);
+  }
+
+  private spawnHeartPickups(count: number) {
+    for (let i = 0; i < count; i++) {
+      const id = `heart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      this.state.food[id] = {
+        id,
+        x: 120 + Math.random() * (this.WORLD_SIZE - 240),
+        y: 120 + Math.random() * (this.WORLD_SIZE - 240),
+        value: 15,
+        type: 'heart',
+        icon: '❤️',
+        color: '#EF4444',
+        hpRestore: 10,
+      };
+    }
   }
 
   private spawnInitialCollectibles(count: number) {
@@ -1551,6 +1600,30 @@ export class GameSessionService {
   }
 
   /**
+   * Quiz Invisibility Mode: while answering an educational quiz, the player's snake becomes
+   * invisible and completely immune to enemy snakes, bots, and arena hazards.
+   * Grants a 2.5s safe re-entry shield when returning to the arena.
+   */
+  public setPlayerQuizMode(userId: string, active: boolean): boolean {
+    const snake = this.state.snakes[userId];
+    if (!snake || !snake.isAlive) return false;
+    if (active) {
+      snake.inQuiz = true;
+      snake.isInvisible = true;
+      snake.inInteraction = true;
+      snake.boosting = false;
+      snake.quizStartedAt = Date.now();
+    } else {
+      snake.inQuiz = false;
+      snake.isInvisible = false;
+      snake.inInteraction = false;
+      snake.quizStartedAt = undefined;
+      snake.shieldTimer = Math.max(snake.shieldTimer || 0, 2.5);
+    }
+    return true;
+  }
+
+  /**
    * Deploy player cleanly to a fresh, enemy-free zone upon accepting a quest
    * so rival snakes/bots cannot immediately ambush them right beside the Quest Master.
    */
@@ -1696,7 +1769,9 @@ export class GameSessionService {
       return {
         ...rest,
         head: { x: r1(s.head.x), y: r1(s.head.y) },
-        b: flat,
+        b: s.isInvisible ? [] : flat,
+        isInvisible: !!s.isInvisible,
+        inQuiz: !!s.inQuiz,
         angle: Math.round(s.angle * 1000) / 1000,
         score: Math.round(s.score),
         hp: r1(s.hp),

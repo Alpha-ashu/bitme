@@ -22,6 +22,7 @@ import {
   renderCritterVector,
   renderShieldPowerAsset,
   renderSpeedPowerAsset,
+  renderHeartPickupAsset,
   renderLogAsset,
   renderCactusHazardAsset,
   renderLavaHazardAsset,
@@ -348,12 +349,14 @@ export class Renderer {
       this.renderCollectible(state.food[i]);
     }
 
-    // Render Snakes
+    // Render Snakes (snakes in an active quiz are invisible in-game)
     for (let i = 0; i < state.snakes.length; i++) {
       const snake = state.snakes[i];
       if (snake.isAlive) {
         this.updateSnakeLerp(snake);
-        this.renderKawaiiVectorSnake(snake, snake.id === targetUserId);
+        if (!snake.isInvisible) {
+          this.renderKawaiiVectorSnake(snake, snake.id === targetUserId);
+        }
       }
     }
 
@@ -676,6 +679,9 @@ export class Renderer {
         break;
       case 'speed':
         renderSpeedPowerAsset(ctx, fx, py, this.animFrame, 17);
+        break;
+      case 'heart':
+        renderHeartPickupAsset(ctx, fx, py, this.animFrame, 15);
         break;
       case 'coupon_box':
       case 'boss_drop':
@@ -1073,7 +1079,7 @@ export class Renderer {
     const myDotR = Math.max(2.5, size * 0.035);
     for (let i = 0; i < state.snakes.length; i++) {
       const s = state.snakes[i];
-      if (!s.isAlive) continue;
+      if (!s.isAlive || s.isInvisible) continue;
       const isT = s.id === targetUserId;
       ctx.beginPath();
       ctx.arc(x + (s.head.x - originX) * scale, y + (s.head.y - originY) * scale, isT ? myDotR : dotR, 0, Math.PI * 2);

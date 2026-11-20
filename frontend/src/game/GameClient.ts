@@ -37,8 +37,20 @@ export interface SnakeData {
   poisonTimer?: number;
   team?: 'red' | 'blue';
   isBoss?: boolean;
+  isInvisible?: boolean; // invisible & untargetable while answering a quiz
+  inQuiz?: boolean;
   equippedAccessory?: string;
   respawnAt?: number; // local-engine only: timestamp (ms) at which a dead bot respawns
+}
+
+export interface HeartStateData {
+  hearts: number;
+  maxHearts: number;
+  heartShards: number;
+  shardsRequired: number;
+  restoreIntervalSec: number;
+  nextRestoreInSec: number;
+  nextRestoreAtMs: number;
 }
 
 export interface FoodData {
@@ -167,6 +179,7 @@ const FOOD_TYPES = [
   { type: 'frog', val: 25, icon: '💎', color: '#10b981' },
   { type: 'crystal', val: 35, icon: '🔷', color: '#38bdf8' },
   // ⭐ stars are a dedicated moving set (§3), not part of the random food roll
+  { type: 'heart', val: 15, icon: '❤️', color: '#ef4444' },
   { type: 'shield', val: 25, icon: '💚', color: '#3399ff' },
   { type: 'speed', val: 25, icon: '⚡', color: '#facc15' },
 ];
@@ -189,7 +202,7 @@ const OBSTACLE_TYPES: Array<{ type: string; icon: string; radius: number; blocki
 ];
 
 // §3 hp restored per food type (local engine health loop)
-const LOCAL_HEAL: Record<string, number> = { cherry: 5, apple: 8, mushroom: 5, frog: 4, crystal: 6, shield: 10, egg: 25 };
+const LOCAL_HEAL: Record<string, number> = { cherry: 5, apple: 8, mushroom: 5, frog: 4, crystal: 6, heart: 10, shield: 10, egg: 25 };
 
 // §power Buff duration + stacking rules. Defaults mirror GameConfig.powers; when a server is
 // reachable, /api/config overwrites these so offline and online play stay on one curve.
@@ -230,7 +243,8 @@ export class GameClient {
   public onWorldFeedback?: (ev: { x: number; y: number; text: string; color: string; shake?: number; boomRadius?: number }) => void;
   public onNpcEncounter?: (encounter: any) => void;
   public onQuestUpdate?: (update: any) => void;
-  public onAuthQuestSync?: (data: { activeQuest: any; activeQuiz: any; npcQuotas?: Record<string, any>; unclaimedRewardBoxCount?: number }) => void;
+  public onHeartState?: (payload: { heartState: HeartStateData; rechargedCount?: number; deducted?: number; reason?: string }) => void;
+  public onAuthQuestSync?: (data: { activeQuest: any; activeQuiz: any; npcQuotas?: Record<string, any>; heartState?: HeartStateData; unclaimedRewardBoxCount?: number }) => void;
   public onRoomMatchStarted?: (room: any) => void;
   public preferredServer = '';
 
@@ -303,7 +317,7 @@ export class GameClient {
         this.socket?.emit('authenticate', authPayload);
       });
 
-      this.socket.on('authenticated', (data: { userId: string; snake: SnakeData; config: ModeConfig; activeQuest?: any; activeQuiz?: any; npcQuotas?: Record<string, any>; unclaimedRewardBoxCount?: number }) => {
+      this.socket.on('authenticated', (data: { userId: string; snake: SnakeData; config: ModeConfig; activeQuest?: any; activeQuiz?: any; npcQuotas?: Record<string, any>; heartState?: HeartStateData; unclaimedRewardBoxCount?: number }) => {
         this.localUserId = data.userId || this.localUserId;
         this.modeConfig = data.config;
         this.onAuthSuccess?.(this.localUserId, data.snake, data.config);
@@ -311,6 +325,7 @@ export class GameClient {
           activeQuest: data.activeQuest || null,
           activeQuiz: data.activeQuiz || null,
           npcQuotas: data.npcQuotas,
+          heartState: data.heartState,
           unclaimedRewardBoxCount: data.unclaimedRewardBoxCount,
         });
       });
@@ -325,6 +340,7 @@ export class GameClient {
       this.socket.on('ability_result', (r: { used: boolean }) => this.onAbilityResult?.(r.used));
       this.socket.on('match_invite', (r: { invites: MatchInviteData[] }) => this.onMatchInvite?.(r)); // §social
       this.socket.on('pickup_event', (r: any) => this.onPickupEvent?.(r));
+      this.socket.on('heart_state', (r: any) => this.onHeartState?.(r));
       this.socket.on('boss_defeated', (r: any) => this.onBossDefeat?.(r));
       this.socket.on('npc_encounter', (enc: any) => this.onNpcEncounter?.(enc));
       this.socket.on('quest_update', (upd: any) => this.onQuestUpdate?.(upd));
@@ -420,8 +436,33 @@ export class GameClient {
 
   public endInteraction() {
     this.localPaused = false;
+    if (this.isLocalEngineRunning && this.localState) {
+      const me = this.localState.snakes.find(s => s.id === this.localUserId);
+      if (me && me.isInvisible) {
+        me.isInvisible = false;
+        me.inQuiz = false;
+        me.shieldTimer = Math.max(me.shieldTimer || 0, 2.5);
+      }
+    }
     if (this.socket && this.isConnected) {
       this.socket.emit('interaction_end');
+    }
+  }
+
+  /** Make the player snake invisible & immune while taking a quiz; grants 2.5s shield on exit. */
+  public setQuizMode(active: boolean) {
+    this.localPaused = active;
+    if (this.isLocalEngineRunning && this.localState) {
+      const me = this.localState.snakes.find(s => s.id === this.localUserId);
+      if (me) {
+        me.isInvisible = active;
+        me.inQuiz = active;
+        me.boosting = false;
+        if (!active) me.shieldTimer = Math.max(me.shieldTimer || 0, 2.5);
+      }
+    }
+    if (this.socket && this.isConnected) {
+      this.socket.emit('quiz_state', { active });
     }
   }
 
@@ -502,7 +543,7 @@ export class GameClient {
     this.localBR = mode === 'battle_royale';
     this.localTeam = mode === 'team';
     const isBossMode = mode === 'boss';
-    this.localMatchTimer = (this.localBR || this.localTeam || isBossMode) ? MATCH_SECONDS : 0;
+    this.localMatchTimer = isBossMode ? 150 : (this.localBR || this.localTeam) ? MATCH_SECONDS : 0;
     this.localMatchOver = false;
     this.localMatchLastTs = 0;
 
@@ -765,9 +806,9 @@ export class GameClient {
       }
     }
 
-    // 1. Update Player Snake Movement (frozen while the app is backgrounded — §12)
+    // 1. Update Player Snake Movement (frozen while backgrounded or invisible in quiz)
     const me = state.snakes.find(s => s.id === this.localUserId);
-    if (me && me.isAlive && !this.localPaused) {
+    if (me && me.isAlive && !this.localPaused && !me.isInvisible && !me.inQuiz) {
       if (this.localNokia) {
         // Cardinal 90° snap steering with 180° instant-reverse protection
         const q = Math.round(this.localInput.angle / (Math.PI / 2)) * (Math.PI / 2);
@@ -807,7 +848,7 @@ export class GameClient {
     for (const b of state.snakes) {
       if (b.id === this.localUserId || !b.isAlive) continue;
       let tx = 0, ty = 0, best = 700 * 700, found = false;
-      if (b.isBoss && me && me.isAlive) {
+      if (b.isBoss && me && me.isAlive && !me.isInvisible && !me.inQuiz) {
         tx = this.wrapDeltaLocal(me.head.x - b.head.x);
         ty = this.wrapDeltaLocal(me.head.y - b.head.y);
         found = true;
@@ -915,6 +956,7 @@ export class GameClient {
         if (!b.isAlive) continue;
         if (this.localTeam && a.team && a.team === b.team) continue; // no friendly fire
         if (this.localPaused && (a.id === this.localUserId || b.id === this.localUserId)) continue; // §12
+        if (a.isInvisible || b.isInvisible || a.inQuiz || b.inQuiz) continue; // quiz invisibility immunity
         const dx = this.wrapDeltaLocal(a.head.x - b.head.x);
         const dy = this.wrapDeltaLocal(a.head.y - b.head.y);
         const clashDist = a.radius + b.radius;
@@ -1219,8 +1261,9 @@ export class GameClient {
     // Same curve as the server: hold full size through the grace period, then close smoothly
     // and reach the final radius at ZONE_CLOSE_AT_PCT of the round.
     const sz = state.safeZone;
-    const elapsed = Math.max(0, MATCH_SECONDS - this.localMatchTimer);
-    const shrinkWindow = Math.max(1, MATCH_SECONDS * ZONE_CLOSE_AT_PCT - ZONE_GRACE);
+    const totalDur = state.mode === 'boss' ? 150 : MATCH_SECONDS;
+    const elapsed = Math.max(0, totalDur - this.localMatchTimer);
+    const shrinkWindow = Math.max(1, totalDur * ZONE_CLOSE_AT_PCT - ZONE_GRACE);
     const progress = Math.min(1, Math.max(0, (elapsed - ZONE_GRACE) / shrinkWindow));
     sz.radius = ZONE_FINAL_R + (ZONE_START_R - ZONE_FINAL_R) * (1 - progress);
     sz.targetRadius = ZONE_FINAL_R;
@@ -1256,6 +1299,12 @@ export class GameClient {
       const blueAlive = state.snakes.filter(s => s.isAlive && s.team === 'blue').length;
       const redAlive = state.snakes.filter(s => s.isAlive && s.team === 'red').length;
       if (this.localMatchTimer <= 0 || blueAlive === 0 || redAlive === 0) {
+        this.localMatchOver = true;
+        state.matchOver = true;
+      }
+    } else if (state.mode === 'boss') {
+      const bossAlive = state.snakes.some(s => s.isBoss && s.isAlive);
+      if (this.localMatchTimer <= 0 || !bossAlive) {
         this.localMatchOver = true;
         state.matchOver = true;
       }

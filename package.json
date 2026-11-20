@@ -11,7 +11,10 @@
     "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
     "android:init": "npx cap add android",
     "android:sync": "npm --prefix frontend run build && npx cap sync android",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "ios:init": "npx cap add ios",
+    "ios:sync": "npm --prefix frontend run build && npx cap sync ios",
+    "ios:open": "npx cap open ios"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
@@ -19,6 +22,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
-    "@capacitor/android": "^6.1.2"
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/ios": "^6.1.2"
   }
 }

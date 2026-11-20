@@ -254,6 +254,9 @@ export interface SnakeState {
   isBoss?: boolean;
   isPaused?: boolean;        // §12 backgrounded player — solo/adventure only (never PvP immunity)
   inInteraction?: boolean;   // safe NPC/quiz interaction freeze in solo/adventure modes
+  inQuiz?: boolean;          // active quiz trial — snake becomes invisible & untargetable
+  isInvisible?: boolean;     // hidden from game canvas & enemies while in quiz
+  quizStartedAt?: number;    // wall-clock ms safety timestamp for quiz invisibility
   isMapPlanning?: boolean;   // safe tactical map planning pause (no enemy attacks while planning)
   mapPlanningStartedAt?: number;
   teamContribution?: number; // Team Battle Royale objective contribution score
@@ -271,6 +274,7 @@ export type CollectibleType =
   | 'lizard'
   | 'egg'
   | 'star'
+  | 'heart'
   | 'shield'
   | 'speed'
   | 'crystal'
@@ -890,4 +894,14 @@ export interface QuizQuestionClient {
   wrongCount: number;
   passThreshold: number;
   mediaUrl?: string;
+}
+
+export interface HeartState {
+  hearts: number;
+  maxHearts: number;
+  heartShards: number;
+  shardsRequired: number;
+  restoreIntervalSec: number;
+  nextRestoreInSec: number;
+  nextRestoreAtMs: number;
 }

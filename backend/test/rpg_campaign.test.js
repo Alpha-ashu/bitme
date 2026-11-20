@@ -24,6 +24,7 @@ const { AdventureProgressionService, CAMPAIGN_WORLDS } = require('../dist/servic
 const { BossProgressionService } = require('../dist/services/BossProgressionService');
 const { QuestionBankService } = require('../dist/services/QuestionBankService');
 const { TeamObjectiveService } = require('../dist/services/TeamObjectiveService');
+const { HeartService, HEART_RESTORE_INTERVAL_MS, HEART_SHARDS_PER_RECHARGE } = require('../dist/services/HeartService');
 
 let httpServer;
 let baseUrl = '';
@@ -749,4 +750,134 @@ test('Safe Fresh-Area Deployment on Quest Accept, Tactical Map Safe Planning Pau
   assert.equal(dbl.json.bonusXp, runXp, 'Watch Ad 2x must grant the exact run XP again');
   assert.equal(db.getProfile(p.user.id).stars, starsBeforeDouble + dbl.json.bonusStars);
 });
+
+// ============================================================================
+// 9. QUIZ INVISIBILITY, WRONG-ANSWER HEART PENALTY (-1), 15-MIN RESTORE & 30-HEART RECHARGE
+// ============================================================================
+test('Quiz Invisibility, Wrong Quiz Answer -1 Heart, 15-Min Heart Restore & 30 In-Game Heart Recharge', async () => {
+  // 1) Quiz Invisibility & Immunity in GameSessionService
+  const sess = new GameSessionService('quiz_invis_hearts_test', 'classic', { kingdom: 1 });
+  sess.stop();
+  const st = sess.getState();
+
+  // Verify the world spawns dedicated ruby Heart collectibles (>= 24)
+  const spawnedHearts = Object.values(st.food).filter(f => f.type === 'heart');
+  assert.ok(spawnedHearts.length >= 24, `Expected >= 24 heart pickups spawned, got ${spawnedHearts.length}`);
+
+  Object.keys(st.snakes).forEach(id => delete st.snakes[id]);
+  const p = await createPlayer('QuizHeartHero');
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${p.token}` };
+
+  const hero = sess.registerPlayer(p.user.id, 'QuizHeartHero');
+  const predator = sess.registerPlayer('pred_1', 'ApexPredator');
+  hero.score = 100; predator.score = 9000;
+  hero.head = { x: 2500, y: 2500 };
+  hero.body = Array.from({ length: 9 }, (_, i) => ({ x: 2500 - i * 14, y: 2500 }));
+  predator.head = { x: 2505, y: 2500 }; // right on top of hero!
+  predator.body = Array.from({ length: 9 }, (_, i) => ({ x: 2505 - i * 14, y: 2500 }));
+
+  // Enter Quiz Mode -> snake becomes invisible & untargetable
+  assert.equal(sess.setPlayerQuizMode(p.user.id, true), true);
+  assert.equal(hero.inQuiz, true);
+  assert.equal(hero.isInvisible, true);
+  const snapDuringQuiz = sess.buildSharedSnapshot();
+  const heroSnap = snapDuringQuiz.snakes.find(s => s.id === p.user.id);
+  assert.equal(heroSnap.isInvisible, true, 'Snapshot must broadcast isInvisible=true during quiz');
+  assert.equal(heroSnap.b.length, 0, 'Invisible quiz snake body must be hidden in snapshot');
+
+  // Overlapping predator MUST NOT kill or damage invisible quiz snake!
+  sess.stepForTest();
+  assert.equal(hero.isAlive, true, 'Invisible snake playing quiz MUST NOT be killed by rival snake');
+
+  // Exit Quiz Mode -> snake reappears with >= 2.5s safe grace shield
+  assert.equal(sess.setPlayerQuizMode(p.user.id, false), true);
+  assert.equal(hero.isInvisible, false);
+  assert.equal(hero.inQuiz, false);
+  assert.ok(hero.shieldTimer >= 2.5, 'Exiting quiz must grant >= 2.5s grace shield');
+
+  // 2) Wrong Quiz Answer deducts 1 Heart + starts 15-minute (900s) restore clock
+  const initH = await api('/api/player/hearts', { headers });
+  assert.equal(initH.status, 200);
+  assert.equal(initH.json.heartState.hearts, 5);
+  assert.equal(initH.json.heartState.maxHearts, 5);
+  assert.equal(initH.json.heartState.restoreIntervalSec, 900);
+  assert.equal(initH.json.heartState.shardsRequired, 30);
+  assert.equal(initH.json.heartState.nextRestoreInSec, 0);
+
+  // Create a quiz session & submit a WRONG answer via REST API
+  const qCreated = QuestionBankService.createQuizSession(p.user.id, {
+    levelNumber: 3, category: 'math', count: 2, untimed: true,
+  });
+  const q1 = qCreated.firstQuestion;
+  const trueAnswer1 = db.getRawDb().prepare('SELECT correct_answer FROM question_bank WHERE question_id = ?').get(q1.questionId).correct_answer;
+  const wrongOpt1 = q1.options.find(o => o.trim().toLowerCase() !== trueAnswer1.trim().toLowerCase());
+
+  const wrongRes = await api('/api/adventure/quiz/answer', {
+    method: 'POST', headers,
+    body: JSON.stringify({ quizSessionId: q1.quizSessionId, questionId: q1.questionId, answer: wrongOpt1, responseMs: 1200 }),
+  });
+  assert.equal(wrongRes.status, 200);
+  assert.equal(wrongRes.json.isCorrect, false);
+  assert.equal(wrongRes.json.heartDeducted, true);
+  assert.equal(wrongRes.json.heartState.hearts, 4, 'Wrong answer MUST deduct 1 heart (5 -> 4)');
+  assert.ok(wrongRes.json.heartState.nextRestoreInSec >= 895 && wrongRes.json.heartState.nextRestoreInSec <= 900, '15-minute restore timer must start immediately');
+
+  // Correct answer MUST NOT deduct a heart
+  const q2 = wrongRes.json.nextQuestion;
+  const trueAnswer2 = db.getRawDb().prepare('SELECT correct_answer FROM question_bank WHERE question_id = ?').get(q2.questionId).correct_answer;
+  const rightRes = await api('/api/adventure/quiz/answer', {
+    method: 'POST', headers,
+    body: JSON.stringify({ quizSessionId: q2.quizSessionId, questionId: q2.questionId, answer: trueAnswer2, responseMs: 1000 }),
+  });
+  assert.equal(rightRes.status, 200);
+  assert.equal(rightRes.json.isCorrect, true);
+  assert.equal(rightRes.json.heartDeducted, false);
+  assert.equal(rightRes.json.heartState.hearts, 4, 'Correct answer MUST NOT deduct a heart');
+
+  // 3) 15-Minute Automatic Heart Restoration Math
+  const t0 = Date.now();
+  // Deduct 2 more hearts at t0 (4 -> 2)
+  HeartService.deductHeart(p.user.id, 2, t0);
+  const at14m59s = HeartService.getHeartState(p.user.id, t0 + HEART_RESTORE_INTERVAL_MS - 1000);
+  assert.equal(at14m59s.hearts, 2, 'Before 15 mins pass, heart must not restore yet');
+  const at15m = HeartService.getHeartState(p.user.id, t0 + HEART_RESTORE_INTERVAL_MS + 100);
+  assert.equal(at15m.hearts, 3, 'After 15 mins, exactly 1 heart must restore (2 -> 3)');
+  const at30m = HeartService.getHeartState(p.user.id, t0 + HEART_RESTORE_INTERVAL_MS * 2 + 100);
+  assert.equal(at30m.hearts, 4, 'After 30 mins, second heart must restore (3 -> 4)');
+
+  // 4) Collecting 30 In-Game Hearts Recharges +1 Full Heart!
+  // Currently at 4/5 hearts, 0/30 shards. Collect 29 hearts -> still 4/5, 29/30 shards
+  for (let i = 0; i < HEART_SHARDS_PER_RECHARGE - 1; i++) {
+    const r = HeartService.collectHeartPickup(p.user.id, 1, t0 + HEART_RESTORE_INTERVAL_MS * 2 + 200);
+    assert.equal(r.rechargedCount, 0);
+  }
+  const before30 = HeartService.getHeartState(p.user.id, t0 + HEART_RESTORE_INTERVAL_MS * 2 + 200);
+  assert.equal(before30.hearts, 4);
+  assert.equal(before30.heartShards, 29);
+
+  // Collect the 30th heart -> IMMEDIATELY recharges +1 full heart (4 -> 5) and resets shards to 0!
+  const on30 = HeartService.collectHeartPickup(p.user.id, 1, t0 + HEART_RESTORE_INTERVAL_MS * 2 + 200);
+  assert.equal(on30.rechargedCount, 1, 'Collecting 30th heart MUST recharge +1 full heart');
+  assert.equal(on30.state.hearts, 5, 'Hearts must recharge from 4 -> 5');
+  assert.equal(on30.state.heartShards, 0, 'Heart shards must reset to 0 after recharge');
+  assert.equal(on30.state.nextRestoreInSec, 0, 'Restore timer must clear at full 5/5 hearts');
+
+  // 5) Live GameSessionService eating a 'heart' collectible increments shards & fires onHeartUpdateCallback!
+  let heartCallbackFired = null;
+  sess.setOnHeartUpdateCallback((uid, hs, recharged) => {
+    heartCallbackFired = { uid, hs, recharged };
+  });
+  // Deduct 1 heart so we're at 4/5, place a heart food directly under hero's head, step once!
+  HeartService.deductHeart(p.user.id, 1);
+  hero.head = { x: 1800, y: 1800 };
+  hero.shieldTimer = 0;
+  st.food['test_heart_pickup_1'] = {
+    id: 'test_heart_pickup_1', x: 1800, y: 1800, value: 15, type: 'heart', icon: '❤️', color: '#EF4444', hpRestore: 10,
+  };
+  sess.stepForTest();
+  assert.ok(heartCallbackFired, 'Eating an in-game heart pickup must trigger onHeartUpdateCallback');
+  assert.equal(heartCallbackFired.uid, p.user.id);
+  assert.equal(heartCallbackFired.hs.heartShards, 1, 'Eating 1 in-game heart pickup must advance shard count to 1/30');
+});
+
 

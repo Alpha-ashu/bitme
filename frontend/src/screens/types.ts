@@ -1,4 +1,4 @@
-import { GameMode, GameStateTick, SnakeData } from '../game/GameClient';
+import { GameMode, GameStateTick, HeartStateData, SnakeData } from '../game/GameClient';
 
 export type Screen = 'splash' | 'app' | 'matchmaking' | 'play' | 'pause' | 'respawn' | 'gameover' | 'victory' | 'admin';
 export type Page =
@@ -205,6 +205,7 @@ export interface AppRuntimeState {
   explorer: any;
   adventure: any;
   rewardBox: { items: any[]; unclaimedCount: number; totals: { stars: number; xp: number; evoXp: number; tickets: number }; powerups: any[] };
+  heartState: HeartStateData;
   npcQuotas: Record<string, any>;
   activeQuest: any;
   activeNpcEncounter: any;
@@ -244,6 +245,9 @@ export interface AppContext {
   refreshExplorer: () => Promise<void>;
   refreshAdventure: (opts?: { world?: number; page?: number }) => Promise<void>;
   refreshRewardBox: () => Promise<void>;
+  refreshHearts: () => Promise<void>;
+  getLiveHeartState: () => HeartStateData;
+  setQuizActive: (active: boolean) => void;
   usePowerup: (powerupId: 'pw_boost' | 'pw_shield' | 'pw_super') => Promise<void>;
   getZoomLabel: () => string;
   startAdventureLevel: (levelNumber: number) => Promise<void>;

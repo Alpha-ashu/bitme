@@ -438,9 +438,20 @@ CREATE TABLE IF NOT EXISTS npc_quest_quota (
   PRIMARY KEY (user_id, npc_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS player_hearts (
+  user_id TEXT PRIMARY KEY,
+  hearts INTEGER NOT NULL DEFAULT 5,
+  max_hearts INTEGER NOT NULL DEFAULT 5,
+  heart_shards INTEGER NOT NULL DEFAULT 0,
+  next_restore_anchor_ms INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 `;
 
 export const RPG_MIGRATION_ROLLBACK_SQL = `
+DROP TABLE IF EXISTS player_hearts;
 DROP TABLE IF EXISTS npc_quest_quota;
 DROP TABLE IF EXISTS player_reward_box;
 DROP TABLE IF EXISTS content_overrides;

@@ -18,14 +18,15 @@ function computeRunStars(score: number, kills: number, items: number, isVictory 
 
 function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }): string {
   const ms = ctx.state.matchStats || {};
+  const me = ctx.state.lastSnake;
+  const score = Math.round(me?.score || 0);
+  const kills = me?.kills || 0;
   const walletStars = ctx.state.profile?.stars ?? 0;
-  const walletTickets = ctx.state.profile?.tickets ?? 0;
-  const runStars = ms.starsEarned || 0;
   const totalItems = ms.totalItems || 0;
   const missions = Array.isArray(ctx.state.missions) ? ctx.state.missions : [];
-  const activeDaily = missions.filter((m: any) => !m.claimed).slice(0, opts?.compact ? 2 : 3);
+  const activeDaily = missions.filter((m: any) => !m.claimed).slice(0, opts?.compact ? 2 : 4);
   const doneCount = missions.filter((m: any) => m.isCompleted).length;
-  const quest = ctx.state.selectedUIMode === 'explorer' ? ctx.state.explorer?.activeQuest : null;
+  const quest = ctx.state.activeQuest || ctx.state.explorer?.activeQuest || null;
 
   const chips: Array<[string, number, string]> = [
     ['farm_cherry_twin', (ms.cherry || 0) + (ms.apple || 0), 'Fruit'],
@@ -34,33 +35,54 @@ function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }
     ['ui_bolt_wood', (ms.speed || 0) + (ms.shield || 0) + (ms.mushroom || 0), 'Boosts'],
   ];
 
+  const questIsQuiz = quest?.state === 'ACTIVE' && (quest.currentStage?.kind === 'quiz' || !!quest.quizSessionId);
+  const questIsClaimable = quest?.state === 'CLAIMABLE';
+
   return `
     <div class="loot-tasks-box">
-      <div class="wallet-balance-bar two-col">
-        <span class="wb-pill gold">${imgBundleSprite('ui_star_wood', 18)} <b>${fmtNum(walletStars)}</b> <small>Stars Balance</small></span>
-        <span class="wb-pill map">${imgBundleSprite('pirate_map', 18)} <b>${walletTickets}</b> <small>Tickets</small></span>
+      <!-- Live Match Stats in Pause Screen -->
+      <div class="pause-stats-banner">
+        <div class="ps-stat"><small>SCORE</small><b>${fmtNum(score)}</b></div>
+        <div class="ps-stat"><small>STARS</small><b>${fmtNum(walletStars)}</b></div>
+        <div class="ps-stat"><small>ITEMS</small><b>${totalItems}</b></div>
+        <div class="ps-stat"><small>KILLS</small><b>${kills}</b></div>
       </div>
 
-      <div class="loot-items-row">
-        ${chips.map(([sprite, qty, label]) => `
-          <div class="loot-chip ${qty > 0 ? 'has' : ''}">
-            ${imgBundleSprite(sprite, 20)}
-            <span><b>${qty}</b><small>${label}</small></span>
+      <!-- Active Adventure Quest (Detailed) -->
+      ${quest ? `
+        <div class="pause-quest-card ${questIsClaimable ? 'claimable' : ''}">
+          <div class="pqc-header">
+            <span class="pqc-tag">${quest.levelNumber ? `Level ${quest.levelNumber}` : 'Active Quest'}</span>
+            <span class="pqc-status">${questIsClaimable ? 'DONE ✓' : `${quest.progress}/${quest.target}`}</span>
           </div>
-        `).join('')}
-      </div>
+          <strong class="pqc-title">${esc(quest.title)}</strong>
+          <p class="pqc-desc">${esc(quest.currentStage?.label || quest.description || 'Complete the park objective')}</p>
+          <div class="task-mini-bar" style="height:8px"><div style="width:${Math.min(100, quest.pct || 0)}%"></div></div>
+          <div class="pqc-actions">
+            ${questIsQuiz ? `
+              <button type="button" id="pause-open-quiz" class="btn btn-sm btn-blue btn-block" style="margin-top:6px">
+                🧠 Open Quiz Challenge
+              </button>
+            ` : ''}
+            ${questIsClaimable ? `
+              <button type="button" id="pause-claim-quest" class="btn btn-sm btn-gold btn-block" style="margin-top:6px">
+                🏆 Claim Quest Reward
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      ` : `
+        <div class="pause-quest-card empty">
+          <span class="pqc-desc">No active quest right now. Explore the park or visit an Elder NPC to accept quests!</span>
+        </div>
+      `}
 
+      <!-- Daily Tasks / Missions Status -->
       <div class="task-status-card">
         <div class="task-status-hdr">
-          <span>Task Status</span>
+          <span>Daily Tasks & Missions</span>
           <b>${doneCount}/${missions.length || 0} Done</b>
         </div>
-        ${quest ? `
-          <div class="task-row is-quest">
-            <div class="task-row-top"><span>${esc(quest.title)}</span><b>${quest.progress}/${quest.target}</b></div>
-            <div class="task-mini-bar"><div style="width:${Math.min(100, quest.pct || 0)}%"></div></div>
-          </div>
-        ` : ''}
         ${activeDaily.length ? activeDaily.map((m: any) => {
           const cur = Math.min(m.targetCount || 1, m.currentCount || 0);
           const tgt = Math.max(1, m.targetCount || 1);
@@ -83,10 +105,81 @@ function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }
               <div class="task-mini-bar"><div style="width:${pct}%"></div></div>
             </div>
           `;
-        }).join('') : `<div class="muted" style="font-size:11.5px;text-align:center;padding:4px">Collect items in the park to advance daily tasks!</div>`}
+        }).join('') : `<div class="muted" style="font-size:11.5px;text-align:center;padding:4px">All daily tasks completed! Great work!</div>`}
+      </div>
+
+      <!-- Loot Collected This Run -->
+      <div class="loot-items-row">
+        ${chips.map(([sprite, qty, label]) => `
+          <div class="loot-chip ${qty > 0 ? 'has' : ''}">
+            ${imgBundleSprite(sprite, 20)}
+            <span><b>${qty}</b><small>${label}</small></span>
+          </div>
+        `).join('')}
       </div>
     </div>
   `;
+}
+
+function svgHeartIcon(state: 'full' | 'half' | 'empty'): string {
+  const fill = state === 'full' ? '#EF4444' : state === 'half' ? '#FB7185' : 'rgba(239, 68, 68, 0.16)';
+  const stroke = state === 'empty' ? '#DC2626' : '#991B1B';
+  return `<svg class="heart-svg ${state}" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="${fill}" stroke="${stroke}" stroke-width="2"/><path d="M7.5 6.4c-.9 0-1.7.7-1.7 1.7" stroke="rgba(255,255,255,0.75)" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>`;
+}
+
+function fmtHeartMMSS(sec: number): string {
+  const s = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r < 10 ? '0' : ''}${r}`;
+}
+
+function buildFiveHeartsBarContent(hs: { hearts: number; maxHearts: number; nextRestoreInSec: number }): { key: string; html: string; low: boolean } {
+  const maxH = hs.maxHearts || 5;
+  const curH = Math.max(0, Math.min(maxH, hs.hearts ?? maxH));
+  let html = '';
+  for (let i = 0; i < maxH; i++) {
+    html += svgHeartIcon(i < curH ? 'full' : 'empty');
+  }
+  const timerTxt = curH < maxH && hs.nextRestoreInSec > 0 ? fmtHeartMMSS(hs.nextRestoreInSec) : '';
+  if (timerTxt) {
+    html += `<span class="heart-restore-timer" id="hud-heart-restore">${timerTxt}</span>`;
+  }
+  return {
+    key: `${curH}_${maxH}_${timerTxt}`,
+    html,
+    low: curH <= 1,
+  };
+}
+
+export function patchHeartHudBar(root: HTMLElement, ctx: AppContext): void {
+  const hs = ctx.getLiveHeartState();
+  const heartsEl = root.querySelector('#hud-hearts-bar') as HTMLElement | null;
+  if (heartsEl) {
+    const h = buildFiveHeartsBarContent(hs);
+    if (heartsEl.dataset.hearts !== h.key) {
+      heartsEl.dataset.hearts = h.key;
+      heartsEl.innerHTML = h.html;
+      heartsEl.classList.toggle('low', h.low);
+      heartsEl.setAttribute('aria-label', `Hearts ${hs.hearts} of ${hs.maxHearts}`);
+    }
+  }
+  const shardEl = root.querySelector('#hud-heart-shards') as HTMLElement | null;
+  if (shardEl) {
+    const showShard = hs.hearts < hs.maxHearts || hs.heartShards > 0;
+    shardEl.style.display = showShard ? 'inline-flex' : 'none';
+    const label = `${hs.heartShards}/${hs.shardsRequired}`;
+    const txtEl = shardEl.querySelector('strong');
+    if (txtEl && txtEl.textContent !== label) txtEl.textContent = label;
+  }
+}
+
+function svgMiniMapBtnIcon(): string {
+  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>`;
+}
+
+function svgMiniZoomBtnIcon(): string {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
 }
 
 function stagePct(score: number): { name: string; pct: number } {
@@ -127,6 +220,14 @@ export function renderGameplayScreen(
   const trackerRight = state.settings.trackerPos === 'right';
   const joyPx = state.settings.joySize === 'small' ? 92 : state.settings.joySize === 'large' ? 132 : 112;
 
+  const isTimed = mode === 'team' || mode === 'boss' || mode === 'battle_royale' || mode === 'event';
+  const defaultSec = mode === 'boss' ? 150 : 180;
+  const initTimerSec = st?.matchTimer !== undefined ? st.matchTimer : defaultSec;
+  const timerPrefix = mode === 'boss' ? 'BOSS' : mode === 'team' ? 'TEAM' : mode === 'battle_royale' ? 'STORM' : 'TIME';
+  const hs = ctx.getLiveHeartState();
+  const hearts = buildFiveHeartsBarContent(hs);
+  const showShards = hs.hearts < hs.maxHearts || hs.heartShards > 0;
+
   let hudTopHtml = '';
   if (mode === 'team') {
     const blue = st?.teamScores?.blue || 0;
@@ -135,28 +236,25 @@ export function renderGameplayScreen(
     const bluePct = Math.round((blue / tot) * 100);
     hudTopHtml = `
       <header class="hud-top-bar hud-team">
-        <div class="hud-pill-team team-blue"><span>🔵 BLUE</span><strong id="tb-blue">${blue}</strong></div>
+        <div class="hud-pill-team team-blue"><span>BLUE</span><strong id="tb-blue">${blue}</strong></div>
         <div class="hud-center-wrap">
           <div class="tb-bar"><div id="tb-fill" class="tb-bar-blue" style="width:${bluePct}%"></div></div>
           <div class="hud-team-meta">
-            <span id="tb-myteam">${me?.team === 'red' ? '🔴 RED TEAM' : '🔵 BLUE TEAM'}</span>
-            <span id="tb-timer" class="hud-timer">${fmtTime(st?.matchTimer ?? 180)}</span>
+            <span id="tb-myteam">${me?.team === 'red' ? 'RED TEAM' : 'BLUE TEAM'}</span>
+            <span id="tb-timer" class="hud-timer">${fmtTime(initTimerSec)}</span>
           </div>
         </div>
-        <div class="hud-pill-team team-red"><strong id="tb-red">${red}</strong><span>RED 🔴</span></div>
+        <div class="hud-pill-team team-red"><strong id="tb-red">${red}</strong><span>RED</span></div>
         <button id="btn-pause" class="hud-pause-btn" aria-label="Pause">⏸</button>
       </header>
       <div class="hud-sub-stats">
-        <span>👤 <b id="tb-player-name">${esc(state.profile?.displayName || 'Player')}</b></span>
+        <span><b id="tb-player-name">${esc(state.profile?.displayName || 'Player')}</b></span>
         <span>Score <b id="tb-player-score">${fmtNum(score)}</b></span>
         <span>Kills <b id="tb-player-kills">${kills}</b></span>
         <span>Rank <b id="tb-player-rank">${rankIdx > 0 ? `#${rankIdx}` : '#—'}</b></span>
       </div>
     `;
   } else {
-    const timerChip = st?.matchTimer !== undefined
-      ? `<div class="hud-stat"><small>${mode === 'battle_royale' ? 'STORM' : 'TIME'}</small><strong id="hv-time">${fmtTime(st.matchTimer)}</strong></div>`
-      : '';
     const extraChip = mode === 'battle_royale'
       ? `<div class="hud-stat"><small>ALIVE</small><strong id="hv-alive">${aliveCount}</strong></div>`
       : `<div class="hud-stat"><small>RANK</small><strong id="hv-rank">${rankIdx > 0 ? `#${rankIdx}` : '#—'}</strong></div>`;
@@ -171,7 +269,6 @@ export function renderGameplayScreen(
           <div class="hud-stat"><small>ITEMS</small><strong id="hv-items">${collectedCnt}</strong></div>
           <div class="hud-stat"><small>KILLS</small><strong id="hv-kills">${kills}</strong></div>
           ${extraChip}
-          ${timerChip}
         </div>
         <div class="hud-stage-wrap">
           <div class="hud-hp-row">
@@ -185,14 +282,32 @@ export function renderGameplayScreen(
     `;
   }
 
+  const vitalsRowHtml = `
+    <div class="hud-vitals-row ${mode === 'team' ? 'is-team' : ''} ${mode === 'boss' ? 'is-boss' : ''}">
+      <div class="hud-hearts-bar ${hearts.low ? 'low' : ''}" id="hud-hearts-bar" data-hearts="${hearts.key}" aria-label="Hearts ${hs.hearts} of ${hs.maxHearts}">
+        ${hearts.html}
+      </div>
+      <div class="heart-shard-chip" id="hud-heart-shards" style="display:${showShards ? 'inline-flex' : 'none'}" title="Collect 30 in-game hearts to recharge +1 Heart">
+        ${svgHeartIcon('full')}
+        <strong>${hs.heartShards}/${hs.shardsRequired}</strong>
+      </div>
+      ${isTimed ? `
+        <div class="hud-mode-timer ${initTimerSec <= 30 ? 'urgent' : ''}" id="hv-timer-pill">
+          <small>${timerPrefix}</small>
+          <strong id="hv-time">${fmtTime(initTimerSec)}</strong>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
   const eventBanner = st?.currentEvent
     ? `<div class="hud-event-pill">${esc(String(st.currentEvent.title || '').replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, ''))}</div>`
     : '';
 
-  const bossBanner = boss
+  const bossBanner = mode === 'boss'
     ? `<div class="hud-boss-bar" id="hv-boss">
-         <span>${esc(boss.displayName)} · Power ${fmtNum(boss.score)}</span>
-         <div class="hud-bar boss"><div style="width:${Math.max(5, Math.min(100, Math.round(((boss.hp || 0) / (boss.maxHp || 1)) * 100)))}%"></div></div>
+         <span><strong id="hv-boss-name">${esc(boss?.displayName || 'Kingdom Boss')}</strong> · <span id="hv-boss-power">Power ${fmtNum(boss?.score || 0)}</span> · <b id="hv-boss-time">${fmtTime(initTimerSec)}</b></span>
+         <div class="hud-bar boss"><div id="hv-boss-fill" style="width:${boss ? Math.max(5, Math.min(100, Math.round(((boss.hp || 0) / (boss.maxHp || 1)) * 100))) : 100}%"></div></div>
        </div>`
     : '';
 
@@ -231,16 +346,28 @@ export function renderGameplayScreen(
     </div>
   ` : '';
 
+  const hudCenterVitals = `
+    <div class="hud-center-vitals">
+      ${bossBanner}
+      ${eventBanner}
+      ${vitalsRowHtml}
+      <div class="hud-power-timers" id="hud-power-timers" data-key="${shieldSec}_${speedSec}_${superSec}_${poisonSec}">${powerPills}</div>
+    </div>
+  `;
+
+  const hudTopRight = `
+    <div class="hud-top-right-bar">
+      <button id="btn-pause" class="hud-pause-btn" aria-label="Pause Game">⏸</button>
+    </div>
+  `;
+
   root.innerHTML = `
     <div class="play-viewport">
       <canvas id="game-canvas"></canvas>
       <div class="hud-overlay">
-        ${hudTopHtml}
-        <div class="hud-power-timers" id="hud-power-timers" data-key="${shieldSec}_${speedSec}_${superSec}_${poisonSec}">${powerPills}</div>
-        ${bossBanner}
-        ${eventBanner}
+        ${hudCenterVitals}
+        ${hudTopRight}
         <div id="active-quest-hud-slot"></div>
-        ${leaderboardHtml}
         ${chargeBarHtml}
         <div id="npc-approach-chip-slot"></div>
         <div id="npc-modal-slot"></div>
@@ -257,8 +384,14 @@ export function renderGameplayScreen(
         <div class="touch-hud touch-divided ${rightSide ? 'swap-sides' : ''}">
           <div class="touch-side-left">
             <div class="touch-util-row">
-              <button id="touch-mini" class="touch-btn sm" aria-label="Tactical Map (Safe Pause)">MAP</button>
-              <button id="touch-zoom" class="touch-btn sm" aria-label="Camera Zoom"><span id="touch-zoom-label">${zoomLbl}</span></button>
+              <button id="touch-mini" class="touch-btn sm" aria-label="Arena Map (Safe Pause)">
+                ${svgMiniMapBtnIcon()}
+                <span class="tbtn-micro">MAP</span>
+              </button>
+              <button id="touch-zoom" class="touch-btn sm" aria-label="Camera Zoom">
+                ${svgMiniZoomBtnIcon()}
+                <span id="touch-zoom-label" class="tbtn-micro" style="font-size:7px;line-height:1;opacity:0.8">${zoomLbl}</span>
+              </button>
             </div>
             <button id="touch-ability" class="touch-btn ${abCd > 0 ? 'cd' : ''} ${shieldSec > 0 ? 'buff-active' : ''}" aria-label="Guard Shield Power">
               ${svgFoodPreview('shield', 28)}
@@ -311,56 +444,13 @@ export function renderGameplayScreen(
   patchQuizOverlay(root, ctx);
 }
 
-/** Non-destructive live Active Quest HUD (updates in-place without touching <canvas>). */
-export function patchActiveQuestHud(root: HTMLElement, ctx: AppContext) {
+/** Non-destructive live Active Quest HUD (Clean minimal play field: quest details visible in Pause screen!). */
+export function patchActiveQuestHud(root: HTMLElement, _ctx: AppContext) {
   const slot = root.querySelector('#active-quest-hud-slot') as HTMLElement | null;
   if (!slot) return;
-  const q = ctx.state.activeQuest;
-  const mode = ctx.state.selectedUIMode;
-  if (!q || q.state === 'CLAIMED' || mode === 'nokia' || mode === 'battle_royale' || mode === 'team') {
-    slot.innerHTML = '';
-    return;
-  }
-  const trackerRight = ctx.state.settings.trackerPos === 'right';
-  const stageText = q.stageTotal > 1 ? `Stage ${q.stageIndex + 1}/${q.stageTotal}` : (q.levelNumber ? `Lv.${q.levelNumber}` : 'Quest');
-  const isClaimable = q.state === 'CLAIMABLE';
-  const isQuizStage = q.state === 'ACTIVE' && q.currentStage?.kind === 'quiz';
-  const timeChip = q.timeRemainingSec !== undefined ? `<span class="qhud-time">${q.timeRemainingSec}s</span>` : '';
-
-  slot.innerHTML = `
-    <aside class="hud-tracker ${trackerRight ? 'pos-right' : 'pos-left'} ${isClaimable ? 'claimable' : ''}">
-      <div class="qhud-top">
-        <small>${esc(stageText)}</small>
-        ${timeChip}
-        <button type="button" id="qhud-abandon" class="qhud-x" title="Abandon Quest">✕</button>
-      </div>
-      <strong class="uname-ellipsis">${esc(q.title)}</strong>
-      <div class="qhud-obj">${esc(q.currentStage?.label || '')}</div>
-      <div class="hud-bar"><div style="width:${Math.min(100, q.pct || 0)}%"></div></div>
-      <div class="qhud-foot">
-        <span>${q.progress}/${q.target}</span>
-        ${isClaimable
-          ? `<button type="button" id="qhud-claim" class="btn btn-xs btn-gold">Collect</button>`
-          : isQuizStage
-            ? `<button type="button" id="qhud-open-quiz" class="btn btn-xs btn-blue">Open Quiz</button>`
-            : `<span class="qhud-pct">${q.pct || 0}%</span>`}
-      </div>
-    </aside>
-  `;
-
-  slot.querySelector('#qhud-claim')?.addEventListener('click', () => void ctx.claimActiveQuest());
-  slot.querySelector('#qhud-abandon')?.addEventListener('click', () => void ctx.abandonActiveQuest());
-  slot.querySelector('#qhud-open-quiz')?.addEventListener('click', async () => {
-    if (ctx.state.activeQuizQuestion) {
-      patchQuizOverlay(root, ctx);
-    } else if (q.quizSessionId) {
-      const r = await api(`/api/adventure/quiz/${encodeURIComponent(q.quizSessionId)}`);
-      if (r.ok && r.data?.currentQuestion) {
-        ctx.state.activeQuizQuestion = r.data.currentQuestion;
-        patchQuizOverlay(root, ctx);
-      }
-    }
-  });
+  // Per user instruction: Keep screen 100% open and uncluttered during gameplay.
+  // Full task details, progress & quiz buttons are accessed safely in the Pause menu!
+  slot.innerHTML = '';
 }
 
 /** Non-destructive NPC Talk Chip when near an NPC (allows reopening after selecting 'Later'). */
@@ -402,6 +492,7 @@ export function patchQuizOverlay(root: HTMLElement, ctx: AppContext) {
     onSubmitAnswer: (qsid, qid, ans, ms) => ctx.submitQuizAnswer(qsid, qid, ans, ms),
     onClose: () => ctx.closeQuizModal(),
     onClaimReady: () => ctx.claimActiveQuest(),
+    getHeartState: () => ctx.getLiveHeartState(),
     onRetryLevel: async () => {
       const lvl = ctx.state.activeQuest?.levelNumber || 1;
       ctx.closeQuizModal();
@@ -439,12 +530,30 @@ export function patchGameplayHudValues(root: HTMLElement, st: GameStateTick, ctx
   set('hud-stage', stage.name);
   set('hv-alive', String(st.snakes.filter(s => s.isAlive).length));
   if (st.matchTimer !== undefined) {
-    set('hv-time', fmtTime(st.matchTimer));
-    set('tb-timer', fmtTime(st.matchTimer));
+    const tStr = fmtTime(st.matchTimer);
+    set('hv-time', tStr);
+    set('tb-timer', tStr);
+    set('hv-boss-time', tStr);
+    const tp = root.querySelector('#hv-timer-pill');
+    if (tp) tp.classList.toggle('urgent', st.matchTimer <= 30);
   }
 
   const hpFill = root.querySelector('#hud-hp-fill') as HTMLElement | null;
   if (hpFill) hpFill.style.width = `${Math.round((hp / maxHp) * 100)}%`;
+
+  // Live 5-Hearts + 15-min restore countdown + X/30 heart-shard recharge chip
+  patchHeartHudBar(root, ctx);
+
+  // Live Boss HP fill bar & name update in Boss Arena
+  const boss = ctx.state.selectedUIMode === 'boss' ? st.snakes.find(s => s.isBoss && s.isAlive) : undefined;
+  if (boss) {
+    set('hv-boss-name', boss.displayName || 'Kingdom Boss');
+    set('hv-boss-power', `Power ${fmtNum(boss.score || 0)}`);
+    const bossFill = root.querySelector('#hv-boss-fill') as HTMLElement | null;
+    if (bossFill) {
+      bossFill.style.width = `${Math.max(5, Math.min(100, Math.round(((boss.hp || 0) / (boss.maxHp || 1)) * 100)))}%`;
+    }
+  }
 
   if (ctx.state.selectedUIMode === 'team' && st.teamScores) {
     const b = st.teamScores.blue || 0;
@@ -539,6 +648,26 @@ export function renderPauseModal(root: HTMLElement, ctx: AppContext) {
   `;
   root.querySelector('#pause-x')?.addEventListener('click', () => ctx.resumeMatch());
   root.querySelector('#pause-resume')?.addEventListener('click', () => ctx.resumeMatch());
+  root.querySelector('#pause-open-quiz')?.addEventListener('click', async () => {
+    const q = ctx.state.activeQuest;
+    if (!q) return;
+    ctx.resumeMatch(); // switch back to game view to show quiz
+    if (ctx.state.activeQuizQuestion) {
+      ctx.setQuizActive(true);
+      patchQuizOverlay(root, ctx);
+    } else if (q.quizSessionId) {
+      const r = await api(`/api/adventure/quiz/${encodeURIComponent(q.quizSessionId)}`);
+      if (r.ok && r.data?.currentQuestion) {
+        ctx.state.activeQuizQuestion = r.data.currentQuestion;
+        ctx.setQuizActive(true);
+        patchQuizOverlay(root, ctx);
+      }
+    }
+  });
+  root.querySelector('#pause-claim-quest')?.addEventListener('click', async () => {
+    await ctx.claimActiveQuest();
+    renderPauseModal(root, ctx);
+  });
   root.querySelector('#pause-sfx')?.addEventListener('click', () => {
     ctx.updateSettings({ sfx: !ctx.state.settings.sfx });
     audio.setSfxEnabled(ctx.state.settings.sfx);
@@ -774,7 +903,7 @@ function showRewardedWatchDialog(
 export function toggleTacticalMapOverlay(
   state: GameStateTick | null,
   myUserId: string,
-  opts?: { onTogglePause?: (paused: boolean) => void; npcQuotas?: Record<string, any> }
+  opts?: { onTogglePause?: (paused: boolean) => void; npcQuotas?: Record<string, any>; activeQuest?: any }
 ) {
   const existing = document.getElementById('tactical-overlay');
   if (existing) {
@@ -783,20 +912,31 @@ export function toggleTacticalMapOverlay(
     return;
   }
 
-  // Safely pause & shield the player while planning on the Tactical Map so no enemy can attack!
+  // Safely pause & shield the player while planning on the Arena Map so no enemy can attack!
   opts?.onTogglePause?.(true);
+
+  const q = opts?.activeQuest && opts.activeQuest.state === 'ACTIVE' ? opts.activeQuest : null;
+  const taskLine = q
+    ? `<div class="map-task-pill"><b>Task:</b> ${esc(q.currentStage?.label || q.title)} <span>(${q.progress}/${q.target})</span></div>`
+    : '';
 
   const overlay = document.createElement('div');
   overlay.id = 'tactical-overlay';
   overlay.className = 'modal-backdrop';
   overlay.innerHTML = `
-    <div class="panel game-wood-rim modal-card tactical-card" style="text-align:center">
+    <div class="panel game-wood-rim modal-card tactical-card compact-map" style="text-align:center">
       <button id="tact-close" class="close-badge crimson" aria-label="Resume Play">${svgCloseX()}</button>
       <div class="ribbon-wrap"><div class="ribbon-plaque blue">Arena Map</div></div>
-      <div class="map-pause-badge">PAUSED · SAFE PLANNING — Enemies Cannot Attack</div>
-      <canvas id="tactical-canvas" width="300" height="300" class="tactical-canvas"></canvas>
-      <p class="subtitle" style="margin-top:6px">Green = Safe Sanctuary · Gold = Quest Masters · Violet = Portals · Dark = You</p>
-      <button id="tact-resume-btn" class="btn btn-primary btn-sm btn-block" style="margin-top:8px">Resume Arena</button>
+      <div class="map-pause-badge">PAUSED · SAFE PLANNING</div>
+      ${taskLine}
+      <canvas id="tactical-canvas" width="260" height="260" class="tactical-canvas"></canvas>
+      <div class="map-legend-row">
+        <span><i class="ml-dot you"></i>You</span>
+        <span><i class="ml-dot task"></i>Task/Guide</span>
+        <span><i class="ml-dot worm"></i>Wormhole</span>
+        <span><i class="ml-dot safe"></i>Sanctuary</span>
+      </div>
+      <button id="tact-resume-btn" class="btn btn-primary btn-sm btn-block">Resume Arena</button>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -811,47 +951,144 @@ export function toggleTacticalMapOverlay(
   const c = overlay.querySelector('#tactical-canvas') as HTMLCanvasElement;
   const c2 = c.getContext('2d');
   if (!c2) return;
-  const s = 300;
+  const s = 260;
   const scale = s / WORLD;
-  c2.fillStyle = '#E8F7F0';
+  c2.fillStyle = '#ECFDF5';
   c2.fillRect(0, 0, s, s);
 
-  if (state?.safeZone) {
+  // Subtle coordinate grid for orientation
+  c2.strokeStyle = 'rgba(16, 185, 129, 0.14)';
+  c2.lineWidth = 1;
+  for (let g = 1; g < 4; g++) {
+    const p = (s / 4) * g;
+    c2.beginPath(); c2.moveTo(p, 0); c2.lineTo(p, s); c2.stroke();
+    c2.beginPath(); c2.moveTo(0, p); c2.lineTo(s, p); c2.stroke();
+  }
+
+  // Storm ring (competitive modes only)
+  if (state?.safeZone && (state.mode === 'battle_royale' || state.mode === 'team' || state.mode === 'boss')) {
     c2.beginPath();
     c2.arc(state.safeZone.centerX * scale, state.safeZone.centerY * scale, state.safeZone.radius * scale, 0, Math.PI * 2);
-    c2.strokeStyle = '#EF4444';
+    c2.strokeStyle = 'rgba(239, 68, 68, 0.7)';
     c2.lineWidth = 2;
     c2.stroke();
   }
+
+  // Safe Sanctuary
   if (state?.sanctuaryZone) {
     c2.beginPath();
     c2.arc(state.sanctuaryZone.centerX * scale, state.sanctuaryZone.centerY * scale, state.sanctuaryZone.radius * scale, 0, Math.PI * 2);
-    c2.fillStyle = 'rgba(16, 185, 129, 0.25)';
+    c2.fillStyle = 'rgba(16, 185, 129, 0.28)';
     c2.fill();
+    c2.strokeStyle = '#059669';
+    c2.lineWidth = 1.5;
+    c2.stroke();
   }
+
+  // Team Battle Control Zones & Bases (important mode objectives)
+  if (state?.teamZones?.length) {
+    for (const z of state.teamZones) {
+      c2.beginPath();
+      c2.arc(z.x * scale, z.y * scale, Math.max(7, z.radius * scale), 0, Math.PI * 2);
+      c2.fillStyle = z.owner === 'blue' ? 'rgba(37, 99, 235, 0.35)' : z.owner === 'red' ? 'rgba(220, 38, 38, 0.35)' : 'rgba(245, 158, 11, 0.28)';
+      c2.fill();
+      c2.strokeStyle = z.owner === 'blue' ? '#2563EB' : z.owner === 'red' ? '#DC2626' : '#D97706';
+      c2.lineWidth = 1.5;
+      c2.stroke();
+    }
+  }
+
+  // Wormholes (important fast-travel landmarks)
+  for (const p of state?.portals || []) {
+    const px = p.x * scale;
+    const py = p.y * scale;
+    c2.beginPath();
+    c2.arc(px, py, 6.5, 0, Math.PI * 2);
+    c2.fillStyle = 'rgba(139, 92, 246, 0.28)';
+    c2.fill();
+    c2.strokeStyle = '#7C3AED';
+    c2.lineWidth = 2;
+    c2.stroke();
+    c2.fillStyle = '#5B21B6';
+    c2.font = '900 8px Outfit, sans-serif';
+    c2.textAlign = 'center';
+    c2.textBaseline = 'middle';
+    c2.fillText('W', px, py + 0.5);
+  }
+
+  // Quest Masters (important guides)
   for (const npc of state?.npcs || []) {
     const qInfo = opts?.npcQuotas?.[npc.id];
+    const nx = npc.x * scale;
+    const ny = npc.y * scale;
     c2.beginPath();
-    c2.arc(npc.x * scale, npc.y * scale, 5.5, 0, Math.PI * 2);
+    c2.arc(nx, ny, 5, 0, Math.PI * 2);
     c2.fillStyle = qInfo?.onCooldown ? '#94A3B8' : '#F59E0B';
     c2.fill();
     c2.strokeStyle = '#FFFFFF';
     c2.lineWidth = 1.5;
     c2.stroke();
   }
-  for (const p of state?.portals || []) {
-    c2.beginPath();
-    c2.arc(p.x * scale, p.y * scale, 4.5, 0, Math.PI * 2);
-    c2.fillStyle = p.color || '#8B5CF6';
-    c2.fill();
+
+  // Player position + Boss marker ONLY (zero random bot dot clutter!)
+  const me = state?.snakes?.find(sn => sn.isAlive && (sn.id === myUserId || sn.userId === myUserId));
+  const boss = state?.snakes?.find(sn => sn.isAlive && sn.isBoss);
+
+  // Active Quest Waypoints / Rescue Beacons / Boss Switches (highlighted diamond markers + dashed guide line!)
+  if (q?.currentStage) {
+    const targets = [
+      ...(q.currentStage.waypoints || []).filter((w: any) => !(q.completedWaypoints || []).includes(w.id)),
+      ...(q.currentStage.switches || []).filter((sw: any) => !(q.activatedSwitches || []).includes(sw.id)),
+    ];
+    targets.forEach((pt: any, idx: number) => {
+      const tx = pt.x * scale;
+      const ty = pt.y * scale;
+      if (idx === 0 && me) {
+        c2.save();
+        c2.beginPath();
+        c2.setLineDash([4, 4]);
+        c2.moveTo(me.head.x * scale, me.head.y * scale);
+        c2.lineTo(tx, ty);
+        c2.strokeStyle = '#D97706';
+        c2.lineWidth = 1.8;
+        c2.stroke();
+        c2.restore();
+      }
+      c2.save();
+      c2.translate(tx, ty);
+      c2.rotate(Math.PI / 4);
+      c2.fillStyle = idx === 0 ? '#FACC15' : '#FDE68A';
+      c2.strokeStyle = '#92400E';
+      c2.lineWidth = 1.8;
+      c2.fillRect(-5, -5, 10, 10);
+      c2.strokeRect(-5, -5, 10, 10);
+      c2.restore();
+    });
   }
-  for (const sn of state?.snakes || []) {
-    if (!sn.isAlive) continue;
-    const isMe = sn.id === myUserId || sn.userId === myUserId;
+
+  if (boss) {
     c2.beginPath();
-    c2.arc(sn.head.x * scale, sn.head.y * scale, isMe ? 5 : (sn.isBoss ? 6 : 3), 0, Math.PI * 2);
-    c2.fillStyle = isMe ? '#102A43' : sn.isBoss ? '#DC2626' : (sn.team === 'red' ? '#EF4444' : '#3B82F6');
+    c2.arc(boss.head.x * scale, boss.head.y * scale, 6.5, 0, Math.PI * 2);
+    c2.fillStyle = '#DC2626';
     c2.fill();
-    if (isMe) { c2.strokeStyle = '#FFF'; c2.lineWidth = 1.5; c2.stroke(); }
+    c2.strokeStyle = '#FFFFFF';
+    c2.lineWidth = 2;
+    c2.stroke();
+  }
+
+  if (me) {
+    const mx = me.head.x * scale;
+    const my = me.head.y * scale;
+    c2.beginPath();
+    c2.arc(mx, my, 8.5, 0, Math.PI * 2);
+    c2.fillStyle = 'rgba(15, 23, 42, 0.22)';
+    c2.fill();
+    c2.beginPath();
+    c2.arc(mx, my, 5.2, 0, Math.PI * 2);
+    c2.fillStyle = '#0F172A';
+    c2.fill();
+    c2.strokeStyle = '#FFFFFF';
+    c2.lineWidth = 2;
+    c2.stroke();
   }
 }

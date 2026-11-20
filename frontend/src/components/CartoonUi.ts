@@ -284,31 +284,152 @@ export function svgNavIcon(
 ): string {
   switch (kind) {
     case 'home':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M12 3L3 10.5V20a1 1 0 0 0 1 1h5v-6h6v6h5a1 1 0 0 0 1-1v-9.5L12 3z" fill="currentColor" opacity="0.26"/><path d="M12 3L3 10.5V20a1 1 0 0 0 1 1h5v-6h6v6h5a1 1 0 0 0 1-1v-9.5L12 3z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Castle Turrets & Fortress Walls -->
+        <path d="M3 21V9.5l2-1.5v2h2v-3l2-1v4h6v-4l2 1v3h2v-2l2 1.5V21H3z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Central Portcullis / Arched Castle Gate -->
+        <path d="M10 21v-4a2 2 0 0 1 4 0v4" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <!-- Royal Pennant Flag on Central Spire -->
+        <path d="M12 6V1.5l3.5 1.75L12 5" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        <!-- Stone Arrow Slits / Windows -->
+        <rect x="6.5" y="12" width="1.5" height="3" rx="0.75" fill="currentColor"/>
+        <rect x="16" y="12" width="1.5" height="3" rx="0.75" fill="currentColor"/>
+      </svg>`;
+
     case 'play':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="6" width="19" height="12" rx="4.5" fill="currentColor" opacity="0.24" stroke="currentColor" stroke-width="2.1"/><path d="M7 12h4M9 10v4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><circle cx="15.5" cy="13.5" r="1.3" fill="currentColor"/><circle cx="17.5" cy="10.5" r="1.3" fill="currentColor"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Ergonomic Video Gamepad Body -->
+        <path d="M7 6h10a4.5 4.5 0 0 1 4.4 5.3l-1.2 6.4a3 3 0 0 1-2.9 2.3h-.3a3 3 0 0 1-2.9-2.2l-.6-2.1a1.2 1.2 0 0 0-1.1-.9H10.6a1.2 1.2 0 0 0-1.1.9l-.6 2.1a3 3 0 0 1-2.9 2.2h-.3a3 3 0 0 1-2.9-2.3L1.6 11.3A4.5 4.5 0 0 1 7 6z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Directional D-Pad Cross on Left Grip -->
+        <path d="M7 10v4M5 12h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <!-- 4 Action Buttons in Diamond Formation on Right Grip -->
+        <circle cx="17" cy="10.5" r="1.1" fill="currentColor"/>
+        <circle cx="15.5" cy="12" r="1.1" fill="currentColor"/>
+        <circle cx="18.5" cy="12" r="1.1" fill="currentColor"/>
+        <circle cx="17" cy="13.5" r="1.1" fill="currentColor"/>
+        <!-- Dual Analog Thumbsticks -->
+        <circle cx="10" cy="15" r="1.4" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="14" cy="15" r="1.4" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.2"/>
+      </svg>`;
+
     case 'story':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H19v18H7.5A2.5 2.5 0 0 0 5 22V4.5z" fill="currentColor" opacity="0.24" stroke="currentColor" stroke-width="2.1"/><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Quest Tome Cover & Spine -->
+        <path d="M4.5 19.5V4.8A2.3 2.3 0 0 1 6.8 2.5H19a1 1 0 0 1 1 1v15.2a1 1 0 0 1-1 1H6.8a2.3 2.3 0 0 0-2.3 2.3v0a.5.5 0 0 1-1-.5z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Gilded Corner Reinforcements -->
+        <path d="M16 2.5h3v3M16 19.7h3v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Embossed Adventure Star on Cover -->
+        <path d="M12.5 7.2l1.1 2.3 2.5.4-1.8 1.8.4 2.5-2.2-1.2-2.2 1.2.4-2.5-1.8-1.8 2.5-.4L12.5 7.2z" fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linejoin="round"/>
+        <!-- Silken Quest Ribbon Bookmark dangling out the bottom -->
+        <path d="M9 2.5v7.5l1.8-1.3 1.8 1.3V2.5" fill="currentColor" fill-opacity="0.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Page Ridge -->
+        <path d="M6.8 19.7H19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>`;
+
     case 'lobby':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.2" stroke="currentColor" stroke-width="2.1"/><path d="M3.5 12h17M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18" stroke="currentColor" stroke-width="1.9"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Tournament Combat Shield Base -->
+        <path d="M12 21.5s7.5-3.8 7.5-9.5V5.5l-7.5-3-7.5 3V12c0 5.7 7.5 9.5 7.5 9.5z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Crossed Battle Sword 1 (TL to BR) -->
+        <line x1="7.5" y1="7.5" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <line x1="6.2" y1="9" x2="9" y2="6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="5.8" cy="9.4" r="0.9" fill="currentColor"/>
+        <!-- Crossed Battle Sword 2 (TR to BL) -->
+        <line x1="16.5" y1="7.5" x2="7.5" y2="16.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <line x1="17.8" y1="9" x2="15" y2="6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="18.2" cy="9.4" r="0.9" fill="currentColor"/>
+        <!-- Central Arena Star Pip -->
+        <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+      </svg>`;
+
+    case 'hub':
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Lower Chest Body -->
+        <rect x="3" y="11" width="18" height="9" rx="2" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Curved Domed Chest Lid -->
+        <path d="M3 11V8.5C3 5.5 6.5 4 12 4s9 1.5 9 4.5V11" fill="currentColor" fill-opacity="0.28" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Center Golden Clasp Lock Plate -->
+        <rect x="10" y="10" width="4" height="4.5" rx="1.2" fill="currentColor" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="12" cy="12" r="0.8" fill="#ffffff"/>
+        <!-- Vertical Iron Reinforcing Straps with Rivets -->
+        <line x1="7" y1="4.8" x2="7" y2="20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <line x1="17" y1="4.8" x2="17" y2="20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>`;
+
     case 'inventory':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><rect x="4" y="7" width="16" height="14" rx="3.5" fill="#F59E0B" opacity="0.28" stroke="currentColor" stroke-width="2.1"/><path d="M9 7V5a3 3 0 0 1 6 0v2M4 12h16" stroke="currentColor" stroke-width="2.1"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Armory Knight Helmet -->
+        <path d="M12 2a8 8 0 0 0-8 8v4c0 4.4 3.6 8 8 8s8-3.6 8-8v-4a8 8 0 0 0-8-8z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Helmet Visor Slit -->
+        <path d="M5 11h14M7 14h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <!-- Center Crest Comb / Plume -->
+        <path d="M12 2v6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>`;
+
     case 'missions':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" fill="#F43F5E" opacity="0.28" stroke="#FB7185" stroke-width="2.1"/><circle cx="12" cy="12" r="4.5" stroke="#FDA4AF" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#FACC15"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Archery Bullseye Target with Arrow -->
+        <circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-width="2"/>
+        <circle cx="12" cy="12" r="5.5" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+        <path d="M12 12l7-7M19 5l-4 .5M19 5l-.5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+
     case 'leaderboard':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M7 4h10v6a5 5 0 0 1-10 0V4z" fill="#FACC15" stroke="#F59E0B" stroke-width="2"/><path d="M12 15v4M8 20h8M4 6h3v3a3 3 0 0 1-3-3zM20 6h-3v3a3 3 0 0 0 3-3z" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Tournament Trophy Cup with Champion Star -->
+        <path d="M6 3h12v6a6 6 0 0 1-12 0V3z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M6 5H3.5a2.5 2.5 0 0 0 0 5H6M18 5h2.5a2.5 2.5 0 0 1 0 5H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M12 15v3.5M8 21h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M12 6.5l.8 1.6 1.8.3-1.3 1.2.3 1.7-1.6-.8-1.6.8.3-1.7-1.3-1.2 1.8-.3L12 6.5z" fill="currentColor"/>
+      </svg>`;
+
     case 'rewards':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><rect x="4" y="9" width="16" height="11" rx="2.5" fill="#FBBF24" stroke="#B45309" stroke-width="2"/><path d="M12 9v11M4 13h16" stroke="#E11D48" stroke-width="2.2"/><path d="M12 9C9 9 7 6.5 8.5 5s3.5 1.5 3.5 4zm0 0c3 0 5-2.5 3.5-4s-3.5 1.5-3.5 4z" fill="#FB7185" stroke="#E11D48" stroke-width="1.4"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Wrapped Gift Box with Ribbon Bow -->
+        <rect x="3.5" y="8.5" width="17" height="12.5" rx="2" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2"/>
+        <path d="M12 8.5V21M3.5 13H20.5" stroke="currentColor" stroke-width="2"/>
+        <path d="M12 8.5C9.5 8.5 7.5 5.5 9 3.8s3.5 1.5 3 4.7zm0 0c2.5 0 4.5-3 3-4.7s-3.5 1.5-3 4.7z" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      </svg>`;
+
     case 'social':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="9" r="3.2" fill="#38BDF8" opacity="0.35" stroke="#38BDF8" stroke-width="2"/><circle cx="16.5" cy="10" r="2.5" stroke="#A78BFA" stroke-width="2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M14 19a4 4 0 0 1 6.5-2" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Dual Adventurers / Guild Party -->
+        <circle cx="9" cy="8" r="3.5" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
+        <path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="16.5" cy="9.5" r="2.8" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M14.5 19a4 4 0 0 1 6-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>`;
+
     case 'events':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M13 2L5 14h6l-1 8 9-12h-6l0-8z" fill="#C084FC" stroke="#FDE047" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Magical Event Thunderbolt Gem -->
+        <path d="M13 2L4.5 13.5h6l-1.5 8.5L20 9.5h-6.5L13 2z" fill="currentColor" fill-opacity="0.28" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </svg>`;
+
     case 'profile':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="4" fill="#4ADE80" opacity="0.35" stroke="#4ADE80" stroke-width="2"/><path d="M5 20a7 7 0 0 1 14 0" fill="#4ADE80" opacity="0.24" stroke="#4ADE80" stroke-width="2" stroke-linecap="round"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Crowned Hero Character Silhouette -->
+        <circle cx="12" cy="11" r="4" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
+        <path d="M4.5 21a7.5 7.5 0 0 1 15 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8.5 6.5l1.5-2.5 2 1.5 2-1.5 1.5 2.5H8.5z" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/>
+      </svg>`;
+
     case 'settings':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.3M12 19.2v2.3M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.3M19.2 12h2.3M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Mechanical Gaming Gear -->
+        <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2"/>
+        <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>`;
+
     default:
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="currentColor" opacity="0.25" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="currentColor" opacity="0.25" stroke="currentColor" stroke-width="2"/></svg>`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <!-- Adventure Grid -->
+        <rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
+        <rect x="13.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="2"/>
+        <rect x="3.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="2"/>
+        <rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
+      </svg>`;
   }
 }
 

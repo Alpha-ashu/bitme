@@ -21,6 +21,7 @@ import { QuestEngineService } from './services/QuestEngineService';
 import { QuestionBankService } from './services/QuestionBankService';
 import { BossProgressionService } from './services/BossProgressionService';
 import { RewardBoxService } from './services/RewardBoxService';
+import { HeartService } from './services/HeartService';
 import { presence } from './services/Presence';
 import { sessionManager } from './services/GameSessionManager';
 import { getModeConfig, GameSessionService } from './services/GameSessionService';
@@ -242,6 +243,7 @@ app.get('/api/player/profile', (req, res) => {
   res.json({
     user: { id: a.userId, username: a.username, isGuest: a.isGuest, role: a.role, isAdmin },
     profile: withRank(rawProfile),
+    heartState: HeartService.getHeartState(a.userId),
   });
 });
 
@@ -667,6 +669,18 @@ app.post('/api/player/use-powerup', writeLimiter, (req, res) => {
   });
 });
 
+app.get('/api/player/hearts', (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  res.json({ ok: true, heartState: HeartService.getHeartState(a.userId) });
+});
+
+app.post('/api/player/hearts/collect', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const count = Math.max(1, Math.min(30, Math.floor(Number(req.body?.count) || 1)));
+  const r = HeartService.collectHeartPickup(a.userId, count);
+  res.json({ ok: true, heartState: r.state, rechargedCount: r.rechargedCount, shardsAdded: r.shardsAdded });
+});
+
 app.get('/api/adventure/level/:levelNumber', (req, res) => {
   const a = auth(req, res); if (!a) return;
   const lvl = Math.max(1, Math.min(1000, Math.floor(Number(req.params.levelNumber) || 1)));
@@ -707,8 +721,8 @@ app.post('/api/adventure/quest/accept', writeLimiter, (req, res) => {
   let deployedTo: { ok: boolean; x?: number; y?: number; minEnemyDistance?: number } | undefined;
   if (liveSession && r.ok) {
     if (r.quizQuestion) {
-      // Keep snake safely frozen if quiz immediately opened
-      liveSession.setPlayerInteraction(a.userId, true);
+      // Make player snake invisible & untargetable while answering the quiz!
+      liveSession.setPlayerQuizMode(a.userId, true);
     } else {
       // Deploy player into a fresh, enemy-free quest area with 4.5s spawn shield so no snake immediately ambushes them!
       const stg = r.session?.currentStage;
@@ -720,6 +734,7 @@ app.post('/api/adventure/quest/accept', writeLimiter, (req, res) => {
   res.status(status).json({
     ...r,
     deployedTo,
+    heartState: HeartService.getHeartState(a.userId),
     overview: AdventureProgressionService.getOverview(a.userId),
     npcQuotas: QuestEngineService.getAllNpcQuotas(a.userId),
   });
@@ -747,14 +762,16 @@ app.post('/api/adventure/quest/skip', writeLimiter, (req, res) => {
 app.post('/api/adventure/quest/abandon', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const r = QuestEngineService.abandonActiveQuest(a.userId);
-  sessionManager.findPlayerSession(a.userId)?.setPlayerInteraction(a.userId, false);
+  const s = sessionManager.findPlayerSession(a.userId);
+  if (s) { s.setPlayerInteraction(a.userId, false); s.setPlayerQuizMode(a.userId, false); }
   res.status(r.ok ? 200 : 400).json(r);
 });
 
 app.post('/api/adventure/quest/claim', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
   const r = QuestEngineService.claimQuest(a.userId, req.body?.sessionId ? String(req.body.sessionId) : undefined);
-  sessionManager.findPlayerSession(a.userId)?.setPlayerInteraction(a.userId, false);
+  const s = sessionManager.findPlayerSession(a.userId);
+  if (s) { s.setPlayerInteraction(a.userId, false); s.setPlayerQuizMode(a.userId, false); }
   res.status(r.ok || r.alreadyClaimed ? 200 : 400).json({
     ...r,
     profile: r.profile ? withRank(r.profile) : undefined,
@@ -766,7 +783,15 @@ app.get('/api/adventure/quiz/:quizSessionId', (req, res) => {
   const a = auth(req, res); if (!a) return;
   const data = QuestionBankService.getSession(a.userId, String(req.params.quizSessionId || ''));
   if (!data) return res.status(404).json({ ok: false, error: 'Quiz session not found' });
-  res.json({ ok: true, session: { id: data.session.id, status: data.session.status, correctCount: data.session.correctCount, wrongCount: data.session.wrongCount, passThreshold: data.session.passThreshold }, currentQuestion: data.currentQuestion });
+  if (data.currentQuestion) {
+    sessionManager.findPlayerSession(a.userId)?.setPlayerQuizMode(a.userId, true);
+  }
+  res.json({
+    ok: true,
+    session: { id: data.session.id, status: data.session.status, correctCount: data.session.correctCount, wrongCount: data.session.wrongCount, passThreshold: data.session.passThreshold },
+    currentQuestion: data.currentQuestion,
+    heartState: HeartService.getHeartState(a.userId),
+  });
 });
 
 app.post('/api/adventure/quiz/answer', writeLimiter, (req, res) => {
@@ -778,6 +803,23 @@ app.post('/api/adventure/quiz/answer', writeLimiter, (req, res) => {
   const result = QuestionBankService.submitAnswer(a.userId, quizSessionId, questionId, answer, responseMs);
   if (!result.ok) return res.status(400).json(result);
 
+  // Wrong quiz answer deducts 1 Heart (15-min restore per heart, or 30 in-game hearts to recharge +1)
+  let heartState = HeartService.getHeartState(a.userId);
+  let heartDeducted = false;
+  if (!result.isCorrect) {
+    const hr = HeartService.deductHeart(a.userId, 1);
+    heartState = hr.state;
+    heartDeducted = hr.deducted > 0;
+    const liveSession = sessionManager.findPlayerSession(a.userId);
+    if (liveSession) {
+      // Emit live heart_state update to player's socket
+      io.sockets.sockets.forEach((s) => {
+        const u = connectedSockets.get(s.id);
+        if (u?.userId === a.userId) s.emit('heart_state', { heartState, deducted: hr.deducted, reason: 'quiz_wrong' });
+      });
+    }
+  }
+
   let questUpdate: any = null;
   if (result.completed && result.questSessionId) {
     questUpdate = QuestEngineService.handleQuizOutcome(
@@ -786,12 +828,8 @@ app.post('/api/adventure/quiz/answer', writeLimiter, (req, res) => {
       !!result.passed,
       result.correctCount || 0
     );
-    const liveSession = sessionManager.findPlayerSession(a.userId);
-    if (liveSession) {
-      liveSession.setPlayerInteraction(a.userId, !!questUpdate?.nextQuiz);
-    }
   }
-  res.json({ ...result, questUpdate });
+  res.json({ ...result, questUpdate, heartState, heartDeducted });
 });
 
 app.get('/api/achievements', (req, res) => {
@@ -1496,6 +1534,10 @@ io.on('connection', (socket) => {
       emitToUser(userId, 'world_feedback', { x, y, text, color });
     });
 
+    session.setOnHeartUpdateCallback((userId, heartState, rechargedCount) => {
+      emitToUser(userId, 'heart_state', { heartState, rechargedCount });
+    });
+
     const snake = session.registerPlayer(a.userId, a.username, skin, false, evolution, region);
     AnalyticsService.track({
       eventType: 'match_start',
@@ -1510,8 +1552,12 @@ io.on('connection', (socket) => {
     const activeQuiz = activeQuest?.quizSessionId
       ? QuestionBankService.getSession(a.userId, activeQuest.quizSessionId)?.currentQuestion || null
       : null;
+    if (activeQuiz) {
+      session.setPlayerQuizMode(a.userId, true);
+    }
     const npcQuotas = QuestEngineService.getAllNpcQuotas(a.userId);
     const rewardBox = RewardBoxService.listBox(a.userId);
+    const heartState = HeartService.getHeartState(a.userId);
 
     socket.emit('authenticated', {
       userId: a.userId,
@@ -1523,6 +1569,7 @@ io.on('connection', (socket) => {
       activeQuest,
       activeQuiz,
       npcQuotas,
+      heartState,
       unclaimedRewardBoxCount: rewardBox.unclaimedCount,
     });
     deliverInvites(a.userId);
@@ -1603,7 +1650,15 @@ io.on('connection', (socket) => {
   });
   socket.on('interaction_end', () => {
     const user = connectedSockets.get(socket.id);
-    if (user) resolveUserSession(user).setPlayerInteraction(user.userId, false);
+    if (user) {
+      const sess = resolveUserSession(user);
+      sess.setPlayerInteraction(user.userId, false);
+      sess.setPlayerQuizMode(user.userId, false);
+    }
+  });
+  socket.on('quiz_state', (data: { active?: boolean }) => {
+    const user = connectedSockets.get(socket.id);
+    if (user) resolveUserSession(user).setPlayerQuizMode(user.userId, Boolean(data?.active));
   });
   socket.on('map_planning', (data: { active?: boolean }) => {
     const user = connectedSockets.get(socket.id);

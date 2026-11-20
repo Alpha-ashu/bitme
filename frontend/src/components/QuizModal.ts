@@ -122,6 +122,29 @@ export interface QuizModalHandlers {
   onClose: () => void;
   onClaimReady?: () => Promise<void>;
   onRetryLevel?: () => Promise<void>;
+  getHeartState?: () => { hearts: number; maxHearts: number; heartShards: number; shardsRequired: number; nextRestoreInSec: number };
+}
+
+function fmtMMSS(sec: number): string {
+  const s = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r < 10 ? '0' : ''}${r}`;
+}
+
+function renderQuizHeartsStrip(hs?: { hearts: number; maxHearts: number; heartShards: number; shardsRequired: number; nextRestoreInSec: number }): string {
+  const maxH = hs?.maxHearts || 5;
+  const curH = Math.max(0, Math.min(maxH, hs?.hearts ?? maxH));
+  const icons = Array.from({ length: maxH }, (_, i) => {
+    const filled = i < curH;
+    const fill = filled ? '#EF4444' : 'rgba(239, 68, 68, 0.16)';
+    const stroke = filled ? '#991B1B' : '#DC2626';
+    return `<svg class="heart-svg ${filled ? 'full' : 'empty'}" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="${fill}" stroke="${stroke}" stroke-width="2"/></svg>`;
+  }).join('');
+  const restoreBadge = curH < maxH && (hs?.nextRestoreInSec || 0) > 0
+    ? `<span class="quiz-restore-time" id="quiz-heart-restore">${fmtMMSS(hs!.nextRestoreInSec)}</span>`
+    : '';
+  return `<div class="quiz-hearts-strip" id="quiz-hearts-strip" title="Wrong answer = -1 Heart (15m restore or 30 hearts in park)">${icons}${restoreBadge}</div>`;
 }
 
 /**
@@ -162,11 +185,20 @@ export function renderQuizModal(
     const diffStars = '★'.repeat(Math.max(1, Math.min(5, Number(currentQ.difficulty) || 1)));
     let timeLeft = currentQ.untimed ? 0 : (Number(currentQ.timeLimitSec) || 25);
 
+    const hs = handlers.getHeartState?.();
     slot.innerHTML = `
       <div class="npc-encounter-backdrop" id="quiz-modal">
         <div class="panel game-wood-rim quiz-card">
           <button type="button" id="quiz-close-x" class="close-badge" aria-label="Close Quiz">${svgCloseX()}</button>
           <div class="ribbon-wrap"><div class="ribbon-plaque blue">${esc(catLabel)} TRIAL · ${qNum}/${total}</div></div>
+
+          <div class="quiz-vitals-bar">
+            ${renderQuizHeartsStrip(hs)}
+            <span class="quiz-invis-pill" title="Your snake is invisible and safe from attacks while answering">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              Snake Invisible
+            </span>
+          </div>
 
           <div class="quiz-meta-row">
             <span class="pill">Difficulty ${diffStars}</span>
@@ -231,6 +263,20 @@ export function renderQuizModal(
         }
 
         lastResult = res;
+        // Refresh the 5-hearts strip immediately on answer (highlights -1 heart on wrong answer)
+        const latestHs = res.heartState || handlers.getHeartState?.();
+        const strip = slot.querySelector('#quiz-hearts-strip');
+        if (strip && latestHs) {
+          strip.outerHTML = renderQuizHeartsStrip(latestHs);
+          if (!res.isCorrect) {
+            slot.querySelector('#quiz-hearts-strip')?.classList.add('heart-lost-pop');
+          }
+        }
+        const wrongPenaltyLine = !res.isCorrect
+          ? `<div class="quiz-heart-loss">${latestHs && latestHs.hearts <= 0
+              ? `−1 ♥ · 0/${latestHs.maxHearts} Hearts left! Collect 30 ♥ in park or wait 15m to recharge.`
+              : `−1 ♥ (${latestHs?.hearts ?? 0}/${latestHs?.maxHearts ?? 5} left · Next ♥ in ${fmtMMSS(latestHs?.nextRestoreInSec || 900)} or collect 30 ♥ in park)`}</div>`
+          : '';
         btn.classList.add(res.isCorrect ? 'correct' : 'wrong');
         if (!res.isCorrect && res.correctAnswer) {
           slot.querySelectorAll<HTMLButtonElement>('[data-opt-val]').forEach(b => {
@@ -249,7 +295,8 @@ export function renderQuizModal(
             const nextQuiz = res.questUpdate?.nextQuiz;
             fb.innerHTML = `
               <div class="quiz-fb ${res.isCorrect ? 'correct' : 'wrong'}">
-                <strong>${res.isCorrect ? 'Correct!' : `Answer: ${esc(res.correctAnswer)}`}</strong>
+                <strong>${res.isCorrect ? 'Correct!' : `Wrong Answer · Correct: ${esc(res.correctAnswer)}`}</strong>
+                ${wrongPenaltyLine}
                 <p>${esc(res.explanation || '')}</p>
               </div>
               <div class="quiz-summary-bar">
@@ -280,7 +327,8 @@ export function renderQuizModal(
           } else {
             fb.innerHTML = `
               <div class="quiz-fb ${res.isCorrect ? 'correct' : 'wrong'}">
-                <strong>${res.isCorrect ? '✓ Correct!' : `✗ Answer: ${esc(res.correctAnswer)}`}</strong>
+                <strong>${res.isCorrect ? '✓ Correct!' : `✗ Wrong Answer · Correct: ${esc(res.correctAnswer)}`}</strong>
+                ${wrongPenaltyLine}
                 <p>${esc(res.explanation || '')}</p>
               </div>
               <button type="button" id="quiz-next-q" class="btn btn-primary btn-block" style="margin-top:8px">Next Question →</button>
