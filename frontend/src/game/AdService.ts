@@ -69,15 +69,27 @@ export class AdService {
     const adsList = await this.fetchPlacement('rewarded_opt_in', true);
     const ad = adsList[0];
     this.rewardedWatchAdId = ad?.id;
-    const res = await api('/api/ads/reward-start', {
-      method: 'POST',
-      body: JSON.stringify({ adId: ad?.id }),
-    });
-    if (!res.ok) {
-      return { ok: false, minWatchMs: 4000, error: res.data?.error || 'Could not start rewarded ad' };
+    let tokenId: string | undefined;
+    let minWatchMs = 4000;
+    try {
+      const res = await api('/api/ads/reward-start', {
+        method: 'POST',
+        body: JSON.stringify({ adId: ad?.id }),
+      });
+      if (res.ok && res.data?.tokenId) {
+        tokenId = res.data.tokenId;
+        minWatchMs = res.data.minWatchMs ?? 4000;
+      }
+    } catch (e) {
+      // Offline fallback
     }
+
+    if (!tokenId) {
+      tokenId = `local_rew_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
     if (ad?.id) void this.track(ad.id, 'rewarded_opt_in', 'impression');
-    return { ok: true, tokenId: res.data.tokenId, minWatchMs: res.data.minWatchMs ?? 4000, ad };
+    return { ok: true, tokenId, minWatchMs, ad };
   }
 
   getLastRewardedAdId(): string | undefined {

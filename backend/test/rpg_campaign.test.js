@@ -749,6 +749,33 @@ test('Safe Fresh-Area Deployment on Quest Accept, Tactical Map Safe Planning Pau
   assert.ok(dbl.json.bonusStars >= runStars, 'Watch Ad 2x must grant at least the full run stars again');
   assert.equal(dbl.json.bonusXp, runXp, 'Watch Ad 2x must grant the exact run XP again');
   assert.equal(db.getProfile(p.user.id).stars, starsBeforeDouble + dbl.json.bonusStars);
+
+  // Replay attempt to double same match again with fresh token must be blocked (single double per match)
+  const secondAd = await api('/api/ads/reward-start', { method: 'POST', headers, body: JSON.stringify({}) });
+  assert.equal(secondAd.status, 200);
+  db.getRawDb().prepare('UPDATE ad_reward_tokens SET issued_at = issued_at - 10000 WHERE id = ?').run(secondAd.json.tokenId);
+  const reDouble = await api('/api/ads/claim', {
+    method: 'POST', headers,
+    body: JSON.stringify({ adToken: secondAd.json.tokenId, doubleMatch: true }),
+  });
+  assert.equal(reDouble.status, 400);
+  assert.match(reDouble.json.error, /already doubled/i);
+
+  // Client-supplied match metadata fallback (offline/guest run) grants full double reward
+  const thirdAd = await api('/api/ads/reward-start', { method: 'POST', headers, body: JSON.stringify({}) });
+  assert.equal(thirdAd.status, 200);
+  db.getRawDb().prepare('UPDATE ad_reward_tokens SET issued_at = issued_at - 10000 WHERE id = ?').run(thirdAd.json.tokenId);
+  const starsBeforeClientRun = db.getProfile(p.user.id).stars;
+  const clientDouble = await api('/api/ads/claim', {
+    method: 'POST', headers,
+    body: JSON.stringify({ adToken: thirdAd.json.tokenId, doubleMatch: true, matchId: 'match_client_offline_run', matchStars: 180, matchXp: 90, score: 225 }),
+  });
+  if (clientDouble.status !== 200) console.error('CLIENT DOUBLE ERROR:', clientDouble.json);
+  assert.equal(clientDouble.status, 200);
+  assert.equal(clientDouble.json.doubled, true);
+  assert.equal(clientDouble.json.bonusStars, 180);
+  assert.equal(clientDouble.json.bonusXp, 90);
+  assert.equal(db.getProfile(p.user.id).stars, starsBeforeClientRun + 180);
 });
 
 // ============================================================================

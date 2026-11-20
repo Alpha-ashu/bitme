@@ -1133,10 +1133,12 @@ class AnacondaParkApp {
     const rankPos = board.findIndex((e: any) => e.id === me?.id) + 1;
     const placement = isVictory ? 1 : (rankPos > 1 ? rankPos : 2);
 
+    const matchId = `match_${this.state.matchStartTs || Date.now()}`;
     const res = (getPlayerToken() || hasConfiguredServer())
       ? await api('/api/match/summary', {
           method: 'POST',
           body: JSON.stringify({
+            matchId,
             mode: this.state.selectedUIMode,
             roomId: this.state.selectedRoomId,
             score: Math.round(me?.score || 0),
@@ -1150,10 +1152,21 @@ class AnacondaParkApp {
         })
       : { ok: false, status: 0, data: null };
     if (res.ok && res.data) {
-      this.state.summary = res.data;
+      this.state.summary = { matchId, ...res.data };
       if (res.data.profile) this.state.profile = res.data.profile;
     } else {
-      this.state.summary = { score: Math.round(me?.score || 0), kills: me?.kills || 0, placement, earnedStars: 0, earnedXP: 0 };
+      const runScore = Math.round(me?.score || 0);
+      const runKills = me?.kills || 0;
+      const fallbackStars = Math.max(50, Math.floor(runScore / 10) + runKills * 50 + (isVictory ? 500 : 0));
+      const fallbackXp = Math.max(25, Math.floor(runScore / 5) + runKills * 100 + (isVictory ? 300 : 0));
+      this.state.summary = {
+        matchId,
+        score: runScore,
+        kills: runKills,
+        placement,
+        earnedStars: fallbackStars,
+        earnedXP: fallbackXp,
+      };
     }
 
     const bestBefore = this.state.profile?.stats?.highestScore || 0;

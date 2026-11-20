@@ -893,7 +893,7 @@ app.post('/api/ads/reward-start', writeLimiter, (req, res) => {
 });
 
 // Server-side record of last match rewards so Watch Ad can legitimately DOUBLE (2×) run rewards once per match
-const lastMatchRewards = new Map<string, { stars: number; xp: number; doubled: boolean; at: number }>();
+const lastMatchRewards = new Map<string, { matchId?: string; stars: number; xp: number; doubled: boolean; at: number }>();
 
 app.post('/api/ads/claim', writeLimiter, (req, res) => {
   const a = auth(req, res); if (!a) return;
@@ -912,39 +912,60 @@ app.post('/api/ads/claim', writeLimiter, (req, res) => {
     return res.status(429).json({ error: `Please wait ${Math.ceil(remaining / 1000)}s before claiming another ad reward` });
   }
 
+  const clientStars = Math.max(0, Math.min(5000, Math.round(Number(req.body?.matchStars || 0))));
+  const clientXp = Math.max(0, Math.min(5000, Math.round(Number(req.body?.matchXp || 0))));
+  const clientScore = Math.max(0, Math.min(100000, Math.round(Number(req.body?.score || 0))));
+  const clientMatchId = req.body?.matchId ? String(req.body.matchId) : undefined;
+
   let bonusStars = defaultBonusStars;
   let bonusXp = 0;
   const prevMatch = lastMatchRewards.get(a.userId);
-  if (doubleMatch && prevMatch && !prevMatch.doubled) {
-    prevMatch.doubled = true;
-    bonusStars = Math.min(2500, Math.max(defaultBonusStars, prevMatch.stars));
-    bonusXp = Math.min(2500, Math.max(0, prevMatch.xp));
-  } else if (doubleMatch && prevMatch?.doubled) {
-    return res.status(400).json({ error: 'Match reward was already doubled' });
-  }
 
-  if (bonusXp > 0) {
-    db.grantRewards(a.userId, { stars: bonusStars, xp: bonusXp, evoXp: 0 });
-    const afterXp = db.getProfile(a.userId)!;
-    const updated = db.updateProfile(a.userId, { tickets: afterXp.tickets + bonusTickets, lastAdClaim: Date.now() });
-    return res.json({
-      success: true,
+  if (doubleMatch) {
+    const isSameMatch = Boolean(
+      prevMatch && (
+        clientMatchId
+          ? prevMatch.matchId === clientMatchId
+          : (!prevMatch.matchId || Date.now() - prevMatch.at < 300000)
+      )
+    );
+    if (isSameMatch && prevMatch?.doubled) {
+      return res.status(400).json({ error: 'Match reward was already doubled' });
+    }
+    const targetStars = (!isSameMatch || !prevMatch || prevMatch.stars <= 0)
+      ? (clientStars > 0 ? clientStars : Math.max(50, Math.round(clientScore * 0.8)))
+      : prevMatch.stars;
+    const targetXp = (!isSameMatch || !prevMatch || prevMatch.xp <= 0)
+      ? (clientXp > 0 ? clientXp : Math.max(25, Math.round(clientScore * 0.5)))
+      : prevMatch.xp;
+
+    bonusStars = Math.min(5000, Math.max(50, targetStars));
+    bonusXp = Math.min(5000, Math.max(0, targetXp));
+
+    const currentMatchId = clientMatchId || prevMatch?.matchId || `match_${Date.now()}`;
+    lastMatchRewards.set(a.userId, {
+      matchId: currentMatchId,
+      stars: bonusStars,
+      xp: bonusXp,
       doubled: true,
-      message: `2× Reward Doubled! +${bonusStars} Stars, +${bonusXp} XP & +${bonusTickets} Tickets.`,
-      bonusStars,
-      bonusXp,
-      bonusTickets,
-      profile: withRank(updated),
+      at: Date.now(),
     });
   }
 
-  const updated = db.updateProfile(a.userId, { stars: profile.stars + bonusStars, tickets: profile.tickets + bonusTickets, lastAdClaim: Date.now() });
+  const { profile: updatedProfile } = db.grantRewards(a.userId, { stars: bonusStars, xp: bonusXp, evoXp: 0 });
+  const updated = db.updateProfile(a.userId, {
+    tickets: (updatedProfile?.tickets ?? profile.tickets) + bonusTickets,
+    lastAdClaim: Date.now(),
+  });
+
   res.json({
     success: true,
     doubled: doubleMatch,
-    message: `2× Reward Claimed! +${bonusStars} Stars & +${bonusTickets} Tickets.`,
+    message: doubleMatch
+      ? `2× Reward Doubled! +${bonusStars} Stars, +${bonusXp} XP & +${bonusTickets} Tickets.`
+      : `Ad Reward Claimed! +${bonusStars} Stars & +${bonusTickets} Tickets.`,
     bonusStars,
-    bonusXp: 0,
+    bonusXp,
     bonusTickets,
     profile: withRank(updated),
   });
@@ -978,7 +999,9 @@ app.post('/api/match/summary', writeLimiter, (req, res) => {
   const result = StatsService.recordMatch(a.userId, req.body || {}, serverPeak);
   if (!result) return res.status(404).json({ error: 'Profile not found' });
   const { authoritative, ...rest } = result;
+  const matchId = String(req.body?.matchId || rest.match?.id || `match_${Date.now()}`);
   lastMatchRewards.set(a.userId, {
+    matchId,
     stars: Math.max(0, Math.round(rest.earnedStars || 0)),
     xp: Math.max(0, Math.round(rest.earnedXP || 0)),
     doubled: false,

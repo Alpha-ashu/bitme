@@ -746,12 +746,17 @@ export function renderResultScreen(root: HTMLElement, ctx: AppContext, isVictory
   const bossWin = ctx.state.lastBossWin;
   const totalItems = ctx.state.matchStats?.totalItems || 0;
   const starsRated = computeRunStars(score, kills, totalItems, isVictory);
-  const baseXp = sum.earnedXP || bossWin?.rewards?.xp || 0;
-  const baseStars = (sum.earnedStars || bossWin?.rewards?.stars || 0) + (ctx.state.matchStats?.starsEarned || 0);
+  const fallbackStars = Math.max(50, Math.floor(score / 10) + kills * 50 + (isVictory ? 500 : 0));
+  const fallbackXp = Math.max(25, Math.floor(score / 5) + kills * 100 + (isVictory ? 300 : 0));
+  const baseStars = (sum.earnedStars || bossWin?.rewards?.stars || 0) + (ctx.state.matchStats?.starsEarned || 0) || fallbackStars;
+  const baseXp = sum.earnedXP || bossWin?.rewards?.xp || fallbackXp;
   const doubled = !!ctx.state.adRewardClaimedThisMatch;
-  const xpEarned = doubled ? (baseXp + (sum.doubledBonusXp || baseXp)) : baseXp;
-  const starsEarned = doubled ? (baseStars + (sum.doubledBonusStars || Math.max(50, baseStars))) : baseStars;
-  const previewAddStars = Math.max(50, baseStars);
+  const addedBonusStars = sum.doubledBonusStars || baseStars;
+  const addedBonusXp = sum.doubledBonusXp || baseXp;
+  const starsEarned = doubled ? (baseStars + addedBonusStars) : baseStars;
+  const xpEarned = doubled ? (baseXp + addedBonusXp) : baseXp;
+  const previewAddStars = baseStars;
+  const currentTotalStars = ctx.state.profile?.stars || 0;
 
   root.innerHTML = `
     <div class="result-shell ${isVictory ? 'is-victory' : 'is-gameover'}">
@@ -766,6 +771,9 @@ export function renderResultScreen(root: HTMLElement, ctx: AppContext, isVictory
             ${svgStarsRating(starsRated, 38)}
             <h1 style="font-size:18px;margin:1px 0">${isVictory ? (bossWin ? `Defeated ${esc(bossWin.boss?.name || 'Kingdom Boss')}!` : 'Apex Champion!') : 'Nice Run, Explorer!'}</h1>
             <p class="subtitle">Mode: <b>${esc(ctx.state.selectedUIMode.replace('_', ' ').toUpperCase())}</b> · Rank <b>#${rank}</b></p>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,200,0,0.18);border:1px solid rgba(255,180,0,0.4);border-radius:12px;padding:2px 10px;font-size:12px;font-weight:700;color:#8f5200;margin-top:3px">
+              ⭐ Total Balance: ${fmtNum(currentTotalStars)}
+            </div>
           </div>
         </div>
 
@@ -786,9 +794,9 @@ export function renderResultScreen(root: HTMLElement, ctx: AppContext, isVictory
         ` : ''}
 
         <div class="ad-double-banner">
-          <small class="ad-double-hint">${doubled ? '2× Reward Doubled! Bonus Stars & XP credited.' : `Watch a short ad to DOUBLE (2×) your run points & stars (+${fmtNum(previewAddStars)} Stars${baseXp > 0 ? ` & +${fmtNum(baseXp)} XP` : ''})!`}</small>
+          <small class="ad-double-hint">${doubled ? `🎉 2× Reward Doubled! +${fmtNum(addedBonusStars)} Stars & +${fmtNum(addedBonusXp)} XP credited to your balance.` : `Watch a short ad to DOUBLE (2×) your run points & stars (+${fmtNum(previewAddStars)} Stars${baseXp > 0 ? ` & +${fmtNum(baseXp)} XP` : ''})!`}</small>
           <button id="res-ad-bonus" class="btn btn-gold btn-block" ${doubled ? 'disabled' : ''}>
-            ${doubled ? '2× Reward Doubled ✓' : `Watch Ad · 2× Double Reward (+${fmtNum(previewAddStars)} Stars)`}
+            ${doubled ? `✓ 2× Reward Doubled (+${fmtNum(addedBonusStars)} ★ Added)` : `Watch Ad · 2× Double Reward (+${fmtNum(previewAddStars)} Stars)`}
           </button>
         </div>
 
@@ -807,12 +815,19 @@ export function renderResultScreen(root: HTMLElement, ctx: AppContext, isVictory
   root.querySelector('#res-x-close')?.addEventListener('click', () => { ctx.go('home'); ctx.setScreen('app'); });
 
   root.querySelector('#res-ad-bonus')?.addEventListener('click', async () => {
+    if (ctx.state.adRewardClaimedThisMatch) return;
     const start = await ads.startRewardedWatch();
     if (!start.ok || !start.tokenId) {
       ctx.toast(start.error || 'Could not start rewarded ad');
       return;
     }
-    showRewardedWatchDialog(root, ctx, start.tokenId, start.minWatchMs, start.ad, undefined, { doubleMatch: true });
+    showRewardedWatchDialog(root, ctx, start.tokenId, start.minWatchMs, start.ad, undefined, {
+      doubleMatch: true,
+      matchId: sum.matchId || `match_${ctx.state.matchStartTs || Date.now()}`,
+      matchStars: previewAddStars,
+      matchXp: Math.max(25, baseXp),
+      score,
+    });
   });
 }
 
@@ -823,7 +838,7 @@ function showRewardedWatchDialog(
   minWatchMs: number,
   ad: any,
   onClaim?: (tokenId: string) => void,
-  extra?: { doubleMatch?: boolean }
+  extra?: { doubleMatch?: boolean; matchId?: string; matchStars?: number; matchXp?: number; score?: number }
 ) {
   const modal = document.createElement('div');
   modal.className = 'modal-backdrop';
@@ -840,7 +855,7 @@ function showRewardedWatchDialog(
   modal.innerHTML = `
     <div class="panel game-wood-rim modal-card">
       <div class="ribbon-wrap"><div class="ribbon-plaque blue">${extra?.doubleMatch ? '2× Double Reward' : 'Sponsored Bonus'}</div></div>
-      <h3 style="text-align:center">${esc(ad?.title || (extra?.doubleMatch ? 'Watch Ad to Double (2×) Your Points!' : 'Watch to Earn Bonus'))}</h3>
+      <h3 style="text-align:center">${esc(ad?.title || (extra?.doubleMatch ? `Watch Ad to Double (2×) +${fmtNum(extra.matchStars || 50)} Stars!` : 'Watch to Earn Bonus'))}</h3>
       ${ad?.description ? `<p class="subtitle" style="text-align:center">${esc(ad.description)}</p>` : ''}
       ${creative}
       <div class="hud-bar gold" style="margin:10px 0"><div id="rew-ad-bar" style="width:0%"></div></div>
@@ -862,7 +877,7 @@ function showRewardedWatchDialog(
       clearInterval(timer);
       if (bar) bar.style.width = '100%';
       btn.disabled = false;
-      btn.textContent = onClaim ? 'Claim Free Instant Respawn!' : 'Claim 2× Double Reward!';
+      btn.textContent = onClaim ? 'Claim Free Instant Respawn!' : `Claim 2× Double Reward (+${fmtNum(extra?.matchStars || 50)} ★)!`;
     } else {
       btn.textContent = `Reward unlocks in ${left}s…`;
     }
@@ -880,22 +895,52 @@ function showRewardedWatchDialog(
       onClaim(tokenId);
       return;
     }
-    const res = await api('/api/ads/claim', {
-      method: 'POST',
-      body: JSON.stringify({ adToken: tokenId, doubleMatch: !!extra?.doubleMatch }),
-    });
+
+    const fallbackBonusStars = extra?.matchStars || 50;
+    const fallbackBonusXp = extra?.matchXp || 25;
+
+    let res: any = { ok: false };
+    if (!tokenId.startsWith('local_rew_') && (getPlayerToken() || hasConfiguredServer())) {
+      try {
+        res = await api('/api/ads/claim', {
+          method: 'POST',
+          body: JSON.stringify({
+            adToken: tokenId,
+            doubleMatch: !!extra?.doubleMatch,
+            matchId: extra?.matchId,
+            matchStars: extra?.matchStars || 0,
+            matchXp: extra?.matchXp || 0,
+            score: extra?.score || 0,
+          }),
+        });
+      } catch (e) {
+        res = { ok: false };
+      }
+    }
+
     modal.remove();
-    if (!res.ok) {
-      ctx.toast(res.data?.error || 'Could not claim reward');
-      return;
-    }
+
+    const addedStars = (res.ok && res.data?.bonusStars) ? res.data.bonusStars : fallbackBonusStars;
+    const addedXp = (res.ok && res.data?.bonusXp) ? res.data.bonusXp : fallbackBonusXp;
+
     ctx.state.adRewardClaimedThisMatch = true;
-    if (ctx.state.summary) {
-      ctx.state.summary.doubledBonusStars = res.data?.bonusStars || 0;
-      ctx.state.summary.doubledBonusXp = res.data?.bonusXp || 0;
+    if (!ctx.state.summary) ctx.state.summary = {};
+    ctx.state.summary.doubledBonusStars = addedStars;
+    ctx.state.summary.doubledBonusXp = addedXp;
+
+    if (res.ok && res.data?.profile) {
+      ctx.state.profile = res.data.profile;
+    } else if (ctx.state.profile) {
+      ctx.state.profile.stars = (ctx.state.profile.stars || 0) + addedStars;
+      ctx.state.profile.xp = (ctx.state.profile.xp || 0) + addedXp;
+      ctx.state.profile.tickets = (ctx.state.profile.tickets || 0) + 2;
     }
-    await ctx.refreshProfile();
-    ctx.toast(res.data?.message || '2× Reward Doubled!');
+
+    if (getPlayerToken()) {
+      void ctx.refreshProfile();
+    }
+
+    ctx.toast(res.data?.message || `🎉 2× Reward Doubled! +${fmtNum(addedStars)} Stars & +${fmtNum(addedXp)} XP added to balance!`);
     renderResultScreen(root, ctx, ctx.state.screen === 'victory');
   });
 }
