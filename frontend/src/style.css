@@ -3311,30 +3311,68 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 /* Pause Screen Enhanced Task & Stats Details */
 .pause-stats-banner {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  margin-bottom: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 8px;
 }
 .ps-stat {
-  background: #f0fdf4;
-  border: 1.5px solid #86efac;
-  border-radius: 12px;
-  padding: 5px 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(242, 252, 247, 0.96) 100%);
+  border: 2px solid #7cd4a6;
+  border-radius: 13px;
+  padding: 4px 2px;
   text-align: center;
   display: flex;
   flex-direction: column;
-  line-height: 1.1;
+  line-height: 1.08;
+  white-space: nowrap;
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #6cc798, 0 6px 12px rgba(11, 61, 40, 0.1);
 }
+.ps-stat.primary {
+  background: linear-gradient(180deg, #fffdf0 0%, #fef08a 100%);
+  border-color: #f59e0b;
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #d97706, 0 6px 12px rgba(180, 83, 9, 0.16);
+}
+.ps-stat.primary small { color: #92400e; }
+.ps-stat.primary b { color: #78350f; }
+
+.ps-stat.stat-stars {
+  border-color: #fbbf24;
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #f59e0b, 0 6px 12px rgba(180, 83, 9, 0.12);
+}
+.ps-stat.stat-stars small { color: #92400e; }
+.ps-stat.stat-stars b { color: #78350f; }
+
+.ps-stat.stat-items {
+  border-color: #34d399;
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #10b981, 0 6px 12px rgba(11, 61, 40, 0.12);
+}
+.ps-stat.stat-items small { color: #065f46; }
+.ps-stat.stat-items b { color: #065f46; }
+
+.ps-stat.stat-kills {
+  border-color: #fb7185;
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #e11d48, 0 6px 12px rgba(11, 61, 40, 0.12);
+}
+.ps-stat.stat-kills small { color: #9f1239; }
+.ps-stat.stat-kills b { color: #9f1239; }
+
+.ps-stat.stat-rank {
+  border-color: #38bdf8;
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #0284c7, 0 6px 12px rgba(11, 61, 40, 0.12);
+}
+.ps-stat.stat-rank small { color: #075985; }
+.ps-stat.stat-rank b { color: #075985; }
+
 .ps-stat small {
-  font-size: 8px;
-  color: #166534;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-size: 8.5px;
+  color: var(--muted);
+  font-weight: 900;
+  letter-spacing: 0.03em;
 }
 .ps-stat b {
   font-family: 'Fredoka', sans-serif;
-  font-size: 13px;
-  color: #064e3b;
+  font-size: 13.5px;
+  color: var(--emerald-deep);
 }
 
 .pause-quest-card {

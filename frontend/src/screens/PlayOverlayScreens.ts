@@ -19,10 +19,16 @@ function computeRunStars(score: number, kills: number, items: number, isVictory 
 function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }): string {
   const ms = ctx.state.matchStats || {};
   const me = ctx.state.lastSnake;
+  const st = ctx.state.lastState;
   const score = Math.round(me?.score || 0);
   const kills = me?.kills || 0;
   const walletStars = ctx.state.profile?.stars ?? 0;
   const totalItems = ms.totalItems || 0;
+  const mode = ctx.state.selectedUIMode;
+  const aliveCount = st?.snakes?.filter((s: any) => s.alive)?.length || 1;
+  const board = st?.leaderboard || [];
+  const rankIdx = board.length && me?.id ? (board.findIndex((e: any) => e.id === me.id) + 1) : 0;
+  const rankStr = rankIdx > 0 ? `#${rankIdx}` : '#—';
   const missions = Array.isArray(ctx.state.missions) ? ctx.state.missions : [];
   const activeDaily = missions.filter((m: any) => !m.claimed).slice(0, opts?.compact ? 2 : 4);
   const doneCount = missions.filter((m: any) => m.isCompleted).length;
@@ -40,12 +46,28 @@ function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }
 
   return `
     <div class="loot-tasks-box">
-      <!-- Live Match Stats in Pause Screen -->
+      <!-- Live Match Stats in Pause Screen (Prominent 3D themed stat pills) -->
       <div class="pause-stats-banner">
-        <div class="ps-stat"><small>SCORE</small><b>${fmtNum(score)}</b></div>
-        <div class="ps-stat"><small>STARS</small><b>${fmtNum(walletStars)}</b></div>
-        <div class="ps-stat"><small>ITEMS</small><b>${totalItems}</b></div>
-        <div class="ps-stat"><small>KILLS</small><b>${kills}</b></div>
+        <div class="ps-stat primary">
+          <small style="display:flex;align-items:center;justify-content:center;gap:3px">${svgStarCoin(11)} SCORE</small>
+          <b>${fmtNum(score)}</b>
+        </div>
+        <div class="ps-stat stat-stars">
+          <small>STARS</small>
+          <b>${fmtNum(walletStars)}</b>
+        </div>
+        <div class="ps-stat stat-items">
+          <small>ITEMS</small>
+          <b>${totalItems}</b>
+        </div>
+        <div class="ps-stat stat-kills">
+          <small>KILLS</small>
+          <b>${kills}</b>
+        </div>
+        <div class="ps-stat stat-rank">
+          <small>${mode === 'battle_royale' ? 'ALIVE' : 'RANK'}</small>
+          <b>${mode === 'battle_royale' ? aliveCount : rankStr}</b>
+        </div>
       </div>
 
       <!-- Active Adventure Quest (Detailed) -->
@@ -255,20 +277,10 @@ export function renderGameplayScreen(
       </div>
     `;
   } else {
-    const extraChip = mode === 'battle_royale'
-      ? `<div class="hud-stat"><small>ALIVE</small><strong id="hv-alive">${aliveCount}</strong></div>`
-      : `<div class="hud-stat"><small>RANK</small><strong id="hv-rank">${rankIdx > 0 ? `#${rankIdx}` : '#—'}</strong></div>`;
-
-    const walletStars = state.profile?.stars ?? 0;
-    const collectedCnt = state.matchStats?.totalItems ?? 0;
     hudTopHtml = `
       <header class="hud-top-bar">
         <div class="hud-stats-row">
           <div class="hud-stat primary"><small style="display:flex;align-items:center;gap:4px">${svgStarCoin(13)} SCORE</small><strong id="hv-score">${fmtNum(score)}</strong></div>
-          <div class="hud-stat"><small>STARS</small><strong id="hv-stars">${fmtNum(walletStars)}</strong></div>
-          <div class="hud-stat"><small>ITEMS</small><strong id="hv-items">${collectedCnt}</strong></div>
-          <div class="hud-stat"><small>KILLS</small><strong id="hv-kills">${kills}</strong></div>
-          ${extraChip}
         </div>
         <div class="hud-stage-wrap">
           <div class="hud-hp-row">
