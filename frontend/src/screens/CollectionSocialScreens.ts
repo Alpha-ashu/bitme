@@ -82,27 +82,6 @@ function showShopInspectModal(
 }
 
 function bindShopActionButtons(scope: HTMLElement, ctx: AppContext, afterAction?: () => void) {
-  scope.querySelectorAll<HTMLElement>('[data-equip-skin]').forEach(b => {
-    b.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const skin = b.dataset.equipSkin!;
-      const r = await api('/api/player/equip', { method: 'POST', body: JSON.stringify({ skin }) });
-      if (!r.ok) { ctx.toast(r.data?.message || 'Cannot equip'); return; }
-      ctx.state.selectedSkin = skin;
-      afterAction?.();
-      await ctx.refreshCollectionData();
-      ctx.toast(`Equipped ${skin} skin!`);
-    });
-  });
-  scope.querySelectorAll<HTMLElement>('[data-buy-skin]').forEach(b => {
-    b.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const r = await api('/api/shop/purchase', { method: 'POST', body: JSON.stringify({ skinId: b.dataset.buySkin }) });
-      ctx.toast(r.data?.message || (r.ok ? 'Unlocked!' : 'Cannot unlock'));
-      afterAction?.();
-      await Promise.all([ctx.refreshProfile(), ctx.refreshCollectionData()]);
-    });
-  });
   scope.querySelectorAll<HTMLElement>('[data-equip-acc]').forEach(b => {
     b.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -157,7 +136,6 @@ export function renderInventoryPage(ctx: AppContext): string {
   const catalogAcc: any[] = state.shopCatalog?.accessories?.length ? state.shopCatalog.accessories : DEFAULT_ACCESSORIES;
 
   const tabs = [
-    { id: 'skins', label: 'Skins' },
     { id: 'accessories', label: 'Wearables' },
     { id: 'eggs', label: 'Eggs' },
     { id: 'coupons', label: 'Coupons' },
@@ -167,41 +145,7 @@ export function renderInventoryPage(ctx: AppContext): string {
   let itemsHtml = '';
   let pager = '';
 
-  if (state.invTab === 'skins') {
-    const flatSkins = SKIN_FAMILIES.flatMap(fam => fam.skins.map(s => ({ ...s, family: fam.family })));
-    const pages = Math.max(1, Math.ceil(flatSkins.length / perPage));
-    colUi.invPage = Math.max(0, Math.min(colUi.invPage, pages - 1));
-    const slice = flatSkins.slice(colUi.invPage * perPage, colUi.invPage * perPage + perPage);
-    const cols = tier === 'tiny' || tier === 'mobile' ? 2 : 3;
-    itemsHtml = `
-      <div class="card-grid-3" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">
-        ${slice.map(s => {
-          const cat = catalogSkins.find((x: any) => x.id === s.id);
-          const isOwned = cat ? !!cat.owned : ownedSkins.has(s.id);
-          const isEquipped = (p.equippedSkin || state.selectedSkin) === s.id;
-          const costStars = cat?.costStars ?? 0;
-          const costTickets = cat?.costTickets ?? 0;
-          const minLv = cat?.minLevel ?? 1;
-          const actionBtn = isEquipped
-            ? `<span class="pill pill-live">Equipped ✓</span>`
-            : isOwned
-              ? `<button class="btn btn-xs btn-primary" data-equip-skin="${esc(s.id)}">Equip</button>`
-              : `<button class="btn btn-xs btn-gold" data-buy-skin="${esc(s.id)}">Buy ${costStars}★</button>`;
-          return `
-            <div class="cosmetic-card ${isEquipped ? 'equipped' : ''}" style="cursor:pointer"
-              data-inspect-kind="skin" data-inspect-id="${esc(s.id)}"
-              data-inspect-title="${esc(s.name)}" data-inspect-sub="${esc(s.family)} · Lv.${minLv}+ · ${costStars ? `${fmtNum(costStars)}★` : 'Starter Gift'}${costTickets ? ` + ${costTickets} Tickets` : ''}">
-              <div class="acc-icon">${svgSnakePreview(s.id, undefined, tier === 'tiny' || tier === 'landscape' ? 54 : 68)}</div>
-              <strong class="uname-ellipsis">${esc(s.name)}</strong>
-              <small>Lv.${minLv}+ · ${costStars ? `${fmtNum(costStars)}★` : 'Free'}</small>
-              ${actionBtn}
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-    pager = pagerHtml('inv', colUi.invPage, pages);
-  } else if (state.invTab === 'accessories') {
+  if (state.invTab === 'accessories') {
     const pages = Math.max(1, Math.ceil(catalogAcc.length / perPage));
     colUi.invPage = Math.max(0, Math.min(colUi.invPage, pages - 1));
     const slice = catalogAcc.slice(colUi.invPage * perPage, colUi.invPage * perPage + perPage);
@@ -234,7 +178,7 @@ export function renderInventoryPage(ctx: AppContext): string {
     const items = [
       { id: 'rare_egg', name: 'Rare Egg', desc: '250-500★ + Tickets & accessory roll' },
       { id: 'mystery_egg', name: 'Mystery Egg', desc: '500-900★ + Guaranteed wearable' },
-      { id: 'golden_chest', name: 'Golden Chest', desc: '750-1250★ + Tickets & skin roll' },
+      { id: 'golden_chest', name: 'Golden Chest', desc: '750-1250★ + Tickets & Rare Wearable' },
     ];
     const per = tier === 'tiny' || tier === 'mobile' ? 2 : 3;
     const pages = Math.max(1, Math.ceil(items.length / per));
@@ -286,9 +230,9 @@ export function renderInventoryPage(ctx: AppContext): string {
       </div>
 
       <div class="armory-live-bar">
-        ${svgSnakePreview(state.selectedSkin || 'Forest', state.equippedAccessory, tier === 'tiny' || tier === 'landscape' ? 46 : 58, p.equippedEvolution)}
+        ${svgSnakePreview(undefined, state.equippedAccessory, tier === 'tiny' || tier === 'landscape' ? 46 : 58, p.equippedEvolution)}
         <div style="min-width:0;flex:1">
-          <strong style="display:block;font-size:14px">${esc(state.selectedSkin || 'Forest')} · ${esc(p.equippedEvolution || 'Baby')}</strong>
+          <strong style="display:block;font-size:14px">${esc(p.displayName || 'Explorer')} · ${esc(p.equippedEvolution || 'Baby')}</strong>
           <small class="muted">${esc(state.equippedAccessory ? `Wearing ${state.equippedAccessory}` : 'Tap any item to inspect & try on')}</small>
         </div>
         <span class="pill">${fmtNum(p.stars || 0)}★</span>

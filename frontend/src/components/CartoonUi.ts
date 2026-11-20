@@ -62,9 +62,9 @@ export function svgAccessoryOverlay(accId?: string): string {
   }
 }
 
-/** Expressive Emerald Cartoon Serpent Mascot (supports skin, accessory & evolution tiers). */
-export function svgSnakePreview(skinId = 'Forest', accessoryId?: string, size = 84, evolution?: string): string {
-  const pal = SKIN_MASCOT_THEMES[skinId] || SKIN_MASCOT_THEMES.Forest;
+/** Expressive Emerald Cartoon Serpent Mascot (supports accessory & evolution tiers). */
+export function svgSnakePreview(_skinId = 'Forest', accessoryId?: string, size = 84, evolution?: string): string {
+  const pal = SKIN_MASCOT_THEMES.Forest;
   const uid = `cq_${++svgUid}`;
   const pat = pal.pattern === 'stars'
     ? `<circle cx="24" cy="64" r="2.2" fill="${pal.crest}"/><circle cx="71" cy="68" r="2.4" fill="${pal.crest}"/><circle cx="58" cy="30" r="2" fill="${pal.crest}"/>`

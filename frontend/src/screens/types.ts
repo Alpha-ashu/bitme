@@ -195,7 +195,7 @@ export interface AppRuntimeState {
   selectedRegion: string;
   selectedRoomId?: string;
   selectedRoomCode?: string;
-  invTab: 'skins' | 'accessories' | 'eggs' | 'coupons';
+  invTab: 'accessories' | 'eggs' | 'coupons';
   missionCat: 'daily' | 'weekly' | 'event' | 'achievements';
   shopCatalog: { skins: any[]; accessories: AccessoryDef[] };
   missions: any[];

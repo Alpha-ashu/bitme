@@ -220,7 +220,7 @@ export function applyPowerConfig(p?: Partial<typeof POWERS>) {
 const MAX_LOCAL_FOOD = 420;
 
 const BOT_NAMES = ['AlphaViper', 'KobraX', 'Slinky', 'GigaPython', 'NeonSnake', 'ShadowSerpent', 'TitanApex'];
-const BOT_SKINS = ['Jungle', 'Ocean', 'Fire', 'Ice', 'Galaxy', 'Golden', 'Shadow'];
+const BOT_SKINS = ['Forest'];
 
 export class GameClient {
   private socket: Socket | null = null;

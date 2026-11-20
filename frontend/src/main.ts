@@ -92,7 +92,7 @@ class AnacondaParkApp {
       selectedSkin: 'Forest',
       equippedAccessory: '',
       selectedRegion: 'Global',
-      invTab: 'skins',
+      invTab: 'accessories',
       missionCat: 'daily',
       shopCatalog: { skins: [], accessories: [] },
       missions: [],

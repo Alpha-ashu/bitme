@@ -102,13 +102,13 @@ function renderHomePage(ctx: AppContext): string {
         </div>
 
         <div class="hero-right-col">
-          <div class="hero-showcase" data-nav="inventory" title="Customize">
-            ${svgSnakePreview(state.selectedSkin || 'Forest', state.equippedAccessory, tier === 'tiny' || tier === 'landscape' ? 52 : 70, p.equippedEvolution)}
+          <div class="hero-showcase" data-nav="inventory" title="Wearables">
+            ${svgSnakePreview(undefined, state.equippedAccessory, tier === 'tiny' || tier === 'landscape' ? 52 : 70, p.equippedEvolution)}
             <div style="flex:1;min-width:0">
-              <strong class="uname-ellipsis">${esc(state.selectedSkin || 'Forest')}</strong>
+              <strong class="uname-ellipsis">${esc(p.displayName || 'Explorer')}</strong>
               <small>${esc(p.equippedEvolution || 'Baby')}</small>
             </div>
-            <span class="btn btn-xs btn-gold">Customize</span>
+            <span class="btn btn-xs btn-gold">Wearables</span>
           </div>
           <div class="hero-stats-mini three-col">
             <div class="mini-kpi"><span>Best</span><b>${fmtNum(p.stats?.highestScore)}</b></div>
@@ -603,14 +603,14 @@ function renderProfilePage(ctx: AppContext): string {
   const identityCard = `
     <section class="panel">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        ${svgSnakePreview(ctx.state.selectedSkin || 'Forest', ctx.state.equippedAccessory, 56, curEvo)}
+        ${svgSnakePreview(undefined, ctx.state.equippedAccessory, 56, curEvo)}
         <div style="min-width:0">
           <strong class="uname-ellipsis" style="font-size:17px;display:block">${esc(p.displayName || 'Explorer')}</strong>
           <small class="muted">${esc(curEvo)} · Lv.${p.level || 1} · Prestige ${prestige}</small>
         </div>
       </div>
       <div class="avatar-picker">
-        ${ONB_AVATARS.map(av => `<button class="av-opt ${p.avatar === av ? 'active' : ''}" data-prof-av="${esc(av)}">${svgAvatarBadge(av, ctx.state.selectedSkin, ctx.state.equippedAccessory, 36)}</button>`).join('')}
+        ${ONB_AVATARS.map(av => `<button class="av-opt ${p.avatar === av ? 'active' : ''}" data-prof-av="${esc(av)}">${svgAvatarBadge(av, undefined, ctx.state.equippedAccessory, 36)}</button>`).join('')}
       </div>
       <form id="prof-name-form" class="inline-form">
         <input id="prof-name-inp" type="text" required minlength="3" maxlength="16" value="${esc(p.displayName || '')}" />
@@ -840,7 +840,7 @@ export function renderAppShell(root: HTMLElement, ctx: AppContext): void {
           </button>
           <button class="topbar-icon-btn" data-nav="settings" aria-label="Settings">${svgNavIcon('settings', 16)}</button>
           <button id="top-auth-btn" class="topbar-profile-pill">
-            ${svgAvatarBadge(p.avatar, state.selectedSkin, state.equippedAccessory, 26)}
+            ${svgAvatarBadge(p.avatar, undefined, state.equippedAccessory, 26)}
             <span class="uname-ellipsis">${state.isGuest ? 'Sign In' : esc(p.displayName || 'Profile')}</span>
           </button>
         </div>

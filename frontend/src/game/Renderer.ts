@@ -237,8 +237,8 @@ export class Renderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  private palette(skin: string): SkinPalette {
-    return SKINS[skin] || SKINS[SKIN_ALIASES[skin]] || SKINS.Forest;
+  private palette(_skin?: string): SkinPalette {
+    return SKINS.Forest;
   }
 
   private getAnimState(id: string) {
