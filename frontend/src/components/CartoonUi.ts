@@ -552,3 +552,117 @@ export function svgFoodPreview(kind: string, size = 56): string {
 export function svgCloseX(): string {
   return `<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/></svg>`;
 }
+
+/** 3D Vector Crown for Leaderboard Ranks 1 (Gold), 2 (Silver), 3 (Bronze) */
+export function svgCrownIcon(rank: 1 | 2 | 3, size = 32): string {
+  const uid = `crn_${rank}_${++svgUid}`;
+  const isGold = rank === 1;
+  const isSilver = rank === 2;
+  const strokeColor = isGold ? '#6d2e05' : isSilver ? '#273444' : '#6b2608';
+  const stop1 = isGold ? '#fff176' : isSilver ? '#ffffff' : '#fed7aa';
+  const stop2 = isGold ? '#f59e0b' : isSilver ? '#cbd5e1' : '#f97316';
+  const stop3 = isGold ? '#b45309' : isSilver ? '#64748b' : '#9a3412';
+  const jewelColor = isGold ? '#ef4444' : isSilver ? '#0ea5e9' : '#10b981';
+
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 36 36" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(80,35,0,0.3))">
+      <defs>
+        <linearGradient id="${uid}_body" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${stop1}"/>
+          <stop offset="50%" stop-color="${stop2}"/>
+          <stop offset="100%" stop-color="${stop3}"/>
+        </linearGradient>
+      </defs>
+      <!-- Base Shadow Band -->
+      <path d="M5 28 L31 28 L28 32 L8 32 Z" fill="rgba(0,0,0,0.25)"/>
+      <!-- Main Crown Silhouette -->
+      <path d="M5 28 L3 12.5 L11 18 L18 6.5 L25 18 L33 12.5 L31 28 Z" fill="url(#${uid}_body)" stroke="${strokeColor}" stroke-width="2.4" stroke-linejoin="round"/>
+      <!-- Pearl Spheres on Prong Tips -->
+      <circle cx="3" cy="12" r="2.6" fill="#ffffff" stroke="${strokeColor}" stroke-width="1.6"/>
+      <circle cx="18" cy="6" r="3.2" fill="#ffffff" stroke="${strokeColor}" stroke-width="1.8"/>
+      <circle cx="33" cy="12" r="2.6" fill="#ffffff" stroke="${strokeColor}" stroke-width="1.6"/>
+      <!-- Base Rim Band -->
+      <path d="M5 25 L31 25 L30 29.5 L6 29.5 Z" fill="${stop2}" stroke="${strokeColor}" stroke-width="1.8" stroke-linejoin="round"/>
+      <!-- Royal Faceted Jewel -->
+      <polygon points="18,21 21,25 18,28.5 15,25" fill="${jewelColor}" stroke="${strokeColor}" stroke-width="1.2"/>
+    </svg>
+  `;
+}
+
+/** 3D Faceted Blue Diamond Gem matching Leaderboard Reference */
+export function svgBlueDiamondGem(size = 30): string {
+  const uid = `gem_blue_${++svgUid}`;
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2.5px 4px rgba(2,132,199,0.4))">
+      <defs>
+        <linearGradient id="${uid}_top" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#bae6fd"/>
+          <stop offset="100%" stop-color="#7dd3fc"/>
+        </linearGradient>
+        <linearGradient id="${uid}_ctr" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#38bdf8"/>
+          <stop offset="100%" stop-color="#0284c7"/>
+        </linearGradient>
+        <linearGradient id="${uid}_bot" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0284c7"/>
+          <stop offset="100%" stop-color="#075985"/>
+        </linearGradient>
+      </defs>
+      <!-- Diamond Facets with Outline -->
+      <g stroke="#082f49" stroke-width="1.6" stroke-linejoin="round">
+        <!-- Top Crown Facets -->
+        <polygon points="9,6 23,6 20,13 12,13" fill="url(#${uid}_top)"/>
+        <polygon points="4,13 9,6 12,13" fill="#e0f2fe"/>
+        <polygon points="23,6 28,13 20,13" fill="#38bdf8"/>
+        <!-- Bottom Pavilion Facets -->
+        <polygon points="4,13 12,13 16,28" fill="#0284c7"/>
+        <polygon points="12,13 20,13 16,28" fill="url(#${uid}_ctr)"/>
+        <polygon points="20,13 28,13 16,28" fill="url(#${uid}_bot)"/>
+      </g>
+      <!-- Brilliant Specular Reflection Star -->
+      <circle cx="9" cy="8.5" r="1.6" fill="#ffffff" opacity="0.95"/>
+      <path d="M12 14 L14 22" stroke="#bae6fd" stroke-width="1" opacity="0.6"/>
+    </svg>
+  `;
+}
+
+/** Happy Cartoon Smiley Avatar with Amber Rim matching reference */
+export function svgHappySmileyAvatar(size = 42, emoji?: string): string {
+  const uid = `face_${++svgUid}`;
+  if (emoji && emoji !== '😊' && emoji !== '🙂' && emoji !== '😀' && emoji !== '🐍') {
+    // If player has a chosen animal/character avatar, render it on a golden coin plaque
+    return `
+      <div style="width:${size}px;height:${size}px;border-radius:50%;background:linear-gradient(180deg,#ffecb3 0%,#ffd54f 100%);border:2.5px solid #d97706;display:grid;place-items:center;font-size:${Math.round(size * 0.58)}px;box-shadow:0 2px 4px rgba(110,50,0,0.22);flex-shrink:0">
+        ${emoji}
+      </div>
+    `;
+  }
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 44 44" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 4px rgba(110,50,0,0.25));flex-shrink:0">
+      <defs>
+        <radialGradient id="${uid}_face" cx="35%" cy="30%" r="65%">
+          <stop offset="0%" stop-color="#fff9c4"/>
+          <stop offset="60%" stop-color="#fbc02d"/>
+          <stop offset="100%" stop-color="#f57f17"/>
+        </radialGradient>
+      </defs>
+      <!-- Outer Amber/Dark Wood Rim -->
+      <circle cx="22" cy="22" r="20.5" fill="#ffecb3" stroke="#b45309" stroke-width="2.4"/>
+      <!-- Sunny Face -->
+      <circle cx="22" cy="22" r="18.2" fill="url(#${uid}_face)" stroke="#853d08" stroke-width="1.8"/>
+      <!-- Specular Reflection Highlight -->
+      <ellipse cx="16" cy="11.5" rx="4.5" ry="2.2" transform="rotate(-22 16 11.5)" fill="#ffffff" opacity="0.75"/>
+      <!-- Dark Oval Eyes with Twin Twinkles -->
+      <ellipse cx="15.5" cy="18" rx="2.5" ry="3.8" fill="#1e293b"/>
+      <circle cx="14.6" cy="16.5" r="1.1" fill="#ffffff"/>
+      <ellipse cx="28.5" cy="18" rx="2.5" ry="3.8" fill="#1e293b"/>
+      <circle cx="27.6" cy="16.5" r="1.1" fill="#ffffff"/>
+      <!-- Cute Rosy Cheeks -->
+      <ellipse cx="10.5" cy="23.5" rx="2.6" ry="1.6" fill="#f97316" opacity="0.55"/>
+      <ellipse cx="33.5" cy="23.5" rx="2.6" ry="1.6" fill="#f97316" opacity="0.55"/>
+      <!-- Open Happy Smile with Tongue -->
+      <path d="M14 23.5 Q22 35 30 23.5 C30 29.5 14 29.5 14 23.5 Z" fill="#991b1b" stroke="#78350f" stroke-width="1.4"/>
+      <path d="M17 28.5 Q22 25 27 28.5 Q22 33.5 17 28.5 Z" fill="#f87171"/>
+    </svg>
+  `;
+}

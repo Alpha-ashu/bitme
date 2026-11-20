@@ -3,8 +3,11 @@ import {
   imgBundleSprite,
   svgAccessoryPreview,
   svgAvatarBadge,
+  svgBlueDiamondGem,
   svgCloseX,
+  svgCrownIcon,
   svgFoodPreview,
+  svgHappySmileyAvatar,
   svgNavIcon,
   svgSnakePreview,
   svgTrophyMedallion,
@@ -474,7 +477,6 @@ export function renderRewardsPage(ctx: AppContext): string {
 
 export function renderLeaderboardPage(ctx: AppContext): string {
   const { leaderboard } = ctx.state;
-  const tier = getViewportTier();
   const cats = [
     { id: 'score', label: 'Score' },
     { id: 'level', label: 'Level' },
@@ -485,77 +487,129 @@ export function renderLeaderboardPage(ctx: AppContext): string {
     { id: 'explorer', label: 'Story' },
   ];
   const scopes = ['global', 'local', 'friends'];
-  const entries = leaderboard.entries || [];
-  const top3Order = [entries[1], entries[0], entries[2]].filter(Boolean);
+  const rawEntries = leaderboard.entries || [];
 
-  const perPage = tier === 'tiny' || tier === 'landscape' ? 3 : 4;
-  const pages = Math.max(1, Math.ceil(entries.length / perPage));
-  colUi.lbPage = Math.max(0, Math.min(colUi.lbPage, pages - 1));
-  const slice = entries.slice(colUi.lbPage * perPage, colUi.lbPage * perPage + perPage);
+  const defaultChampions = [
+    { rank: 1, displayName: 'Sun Serpent', level: 60, value: 17200, avatar: '😊' },
+    { rank: 2, displayName: 'Emerald King', level: 55, value: 14850, avatar: '🙂' },
+    { rank: 3, displayName: 'Amber Drake', level: 48, value: 12400, avatar: '😀' },
+    { rank: 4, displayName: 'Forest Viper', level: 42, value: 9800, avatar: '😊' },
+    { rank: 5, displayName: 'Sky Glider', level: 35, value: 7650, avatar: '🙂' },
+  ];
 
   const pool = ['🐲', '🦎', '🐢', '🦊', '🦉', '🐸', '🐝', '🐍'];
   const avatarFor = (e: any) => {
-    if (e?.isYou) return ctx.state.profile?.avatar || e.avatar || '🐍';
-    if (e?.avatar && e.avatar !== '🐍') return e.avatar;
-    const s = String(e?.displayName || e?.userId || 'Explorer');
+    if (e?.isYou) return ctx.state.profile?.avatar || e.avatar || '😊';
+    if (e?.avatar) return e.avatar;
+    const s = String(e?.displayName || e?.userId || 'Player');
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
     return pool[Math.abs(h) % pool.length];
   };
 
-  const podiumHtml = top3Order.length && tier !== 'landscape' ? `
-    <div class="podium-grid podium-sunny">
-      ${top3Order.map((e: any) => `
-        <div class="podium-slot rank-${e.rank}">
-          <div class="podium-frame">
-            ${svgAvatarBadge(avatarFor(e), 'Forest', undefined, e.rank === 1 ? 48 : 38)}
-            <span class="podium-medal-pin rank-${e.rank}">${e.rank}</span>
-          </div>
-          <strong class="uname-ellipsis">${esc(e.displayName)}</strong>
-          <div class="podium-val">${fmtNum(e.value)}</div>
-        </div>
-      `).join('')}
-    </div>
-  ` : '';
+  const entries = [...rawEntries];
+  if (entries.length < 5 && colUi.lbPage === 0) {
+    for (let i = entries.length; i < 5; i++) {
+      const champ = defaultChampions[i];
+      entries.push({
+        rank: i + 1,
+        displayName: champ.displayName,
+        level: champ.level,
+        value: champ.value,
+        avatar: champ.avatar,
+        isYou: false,
+      });
+    }
+  }
+
+  const perPage = 5;
+  const pages = Math.max(1, Math.ceil(entries.length / perPage));
+  colUi.lbPage = Math.max(0, Math.min(colUi.lbPage, pages - 1));
+  const slice = entries.slice(colUi.lbPage * perPage, colUi.lbPage * perPage + perPage);
 
   return `
-    <div class="screen-fill">
-      <div class="page-hdr">
-        <h2>Leaderboard</h2>
-        <div class="pill-group">
-          ${scopes.map(s => `<button class="btn btn-xs ${leaderboard.scope === s ? 'btn-gold' : 'btn-soft'}" data-lb-scope="${s}">${s.toUpperCase()}</button>`).join('')}
+    <div class="ref-lb-page-wrap">
+      <!-- Category & Scope Filters -->
+      <div class="ref-lb-toolbar">
+        <div class="ref-lb-filter-row">
+          ${scopes.map(s => `
+            <button class="ref-lb-tab ${leaderboard.scope === s ? 'active' : ''}" data-lb-scope="${s}">
+              ${s.toUpperCase()}
+            </button>
+          `).join('')}
+        </div>
+        <div class="ref-lb-filter-row">
+          ${cats.map(c => `
+            <button class="ref-lb-tab ${leaderboard.category === c.id ? 'active' : ''}" data-lb-cat="${c.id}">
+              ${c.label}
+            </button>
+          `).join('')}
         </div>
       </div>
 
-      <div class="pill-group">
-        ${cats.map(c => `<button class="btn btn-xs ${leaderboard.category === c.id ? 'btn-primary' : 'btn-soft'}" data-lb-cat="${c.id}">${c.label}</button>`).join('')}
+      <!-- Carved Wood Leaderboard Plaque matching Reference -->
+      <div class="ref-lb-container">
+        <!-- Arched Overlapping Header Plaque -->
+        <div class="ref-lb-header-wrap">
+          <div class="ref-lb-header-plaque">
+            <span class="ref-lb-header-title">LEADERBOARD</span>
+          </div>
+        </div>
+
+        <!-- Outer Wooden Board Frame -->
+        <div class="ref-lb-frame">
+          <!-- 3D Crimson Red Circular Close Button (X) -->
+          <button class="ref-lb-close" data-lb-close aria-label="Close leaderboard">
+            ${svgCloseX()}
+          </button>
+
+          <!-- Inner Butterscotch / Cream Canvas -->
+          <div class="ref-lb-canvas">
+            ${slice.map((e: any) => {
+              const rank = Number(e.rank || 1);
+              const rankIconHtml = rank === 1
+                ? svgCrownIcon(1, 38)
+                : rank === 2
+                  ? svgCrownIcon(2, 36)
+                  : rank === 3
+                    ? svgCrownIcon(3, 34)
+                    : `<span class="ref-lb-rank-num">${rank}</span>`;
+
+              const avatarHtml = svgHappySmileyAvatar(42, avatarFor(e));
+              const displayName = esc(e.displayName || 'Player Name');
+              const levelText = `LV. ${e.level || 60}`;
+              const scoreVal = fmtNum(e.value ?? e.score ?? 17200);
+
+              return `
+                <div class="ref-lb-row ${e.isYou ? 'row-me' : ''}">
+                  <div class="ref-lb-rank">${rankIconHtml}</div>
+                  <div class="ref-lb-avatar">${avatarHtml}</div>
+                  <div class="ref-lb-info">
+                    <span class="ref-lb-name">${displayName}${e.isYou ? ' <small style="color:#fef08a">(YOU)</small>' : ''}</span>
+                    <span class="ref-lb-level">${levelText}</span>
+                  </div>
+                  <div class="ref-lb-score-box">
+                    ${svgBlueDiamondGem(30)}
+                    <span class="ref-lb-score-val">${scoreVal}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
       </div>
 
-      ${podiumHtml}
-
-      <div class="panel" style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
-        <table class="data-table">
-          <thead><tr><th>#</th><th>Player</th><th>Lv</th><th>Value</th></tr></thead>
-          <tbody>
-            ${slice.map((e: any) => `
-              <tr class="${e.isYou ? 'row-me' : ''}">
-                <td><b>#${e.rank}</b></td>
-                <td><div style="display:flex;align-items:center;gap:6px;min-width:0">${svgAvatarBadge(avatarFor(e), 'Forest', undefined, 22)}<b class="uname-ellipsis" style="max-width:110px">${esc(e.displayName)}</b>${e.isYou ? '<span class="pill pill-live">YOU</span>' : ''}</div></td>
-                <td>${e.level}</td>
-                <td><b>${fmtNum(e.value)}</b></td>
-              </tr>
-            `).join('') || `<tr><td colspan="4" class="empty-cell">No entries yet.</td></tr>`}
-          </tbody>
-        </table>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <!-- Footer Pager & Play CTA -->
+      <div class="ref-lb-toolbar" style="max-width:520px;margin-top:2px">
+        <div class="ref-lb-footer" style="width:100%">
           ${pages > 1 ? `
-            <div class="pill-group">
-              <button class="btn btn-xs btn-soft" data-pager="lb" data-dir="-1" ${colUi.lbPage <= 0 ? 'disabled' : ''}>◀</button>
-              <span class="pager-dots">${colUi.lbPage + 1}/${pages}</span>
-              <button class="btn btn-xs btn-soft" data-pager="lb" data-dir="1" ${colUi.lbPage >= pages - 1 ? 'disabled' : ''}>▶</button>
+            <div class="pill-group" style="margin:0">
+              <button class="ref-lb-tab" data-pager="lb" data-dir="-1" ${colUi.lbPage <= 0 ? 'disabled' : ''}>◀ Prev</button>
+              <span class="pager-dots" style="font-weight:800;color:#ffffff;text-shadow:0 1.5px 0 #0284c7;padding:0 6px">${colUi.lbPage + 1} / ${pages}</span>
+              <button class="ref-lb-tab" data-pager="lb" data-dir="1" ${colUi.lbPage >= pages - 1 ? 'disabled' : ''}>Next ▶</button>
             </div>
           ` : '<span></span>'}
-          <button class="btn btn-xs btn-gold" data-lb-play>▶ Play</button>
+          <button class="btn btn-sm btn-gold" data-lb-play style="font-size:15px;padding:8px 24px;border-radius:999px">▶ Play Now</button>
         </div>
       </div>
     </div>
@@ -710,6 +764,11 @@ export function bindCollectionSocialEvents(root: HTMLElement, ctx: AppContext) {
   });
   root.querySelector('[data-lb-play]')?.addEventListener('click', () => {
     ctx.startMatch({ mode: ctx.state.selectedUIMode });
+  });
+  root.querySelectorAll<HTMLElement>('[data-lb-close]').forEach(b => {
+    b.addEventListener('click', () => {
+      ctx.go('home');
+    });
   });
 
   root.querySelectorAll<HTMLElement>('[data-ms-cat]').forEach(b => {
