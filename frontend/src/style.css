@@ -145,20 +145,20 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   position: relative;
 }
 
-/* ── Compact Mint-White Game Header ────────────────────────── */
+/* ── Warm Cartoon Game Header ────────────────────────── */
 .app-topbar {
   flex-shrink: 0;
   z-index: 30;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: 6px 10px;
   padding: calc(7px + var(--safe-t)) calc(12px + var(--safe-r)) 8px calc(12px + var(--safe-l));
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(242, 253, 247, 0.95) 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
   backdrop-filter: blur(14px);
-  border-bottom: 2.5px solid #9de0bd;
-  box-shadow: 0 3px 0 rgba(95, 195, 142, 0.3), 0 8px 20px rgba(11, 61, 40, 0.08);
+  border-bottom: 2.5px solid #d97706;
+  box-shadow: 0 3px 0 #b45309, 0 8px 20px rgba(120, 53, 15, 0.1);
   color: var(--ink);
 }
 
@@ -168,10 +168,10 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   font-family: 'Fredoka', sans-serif;
   font-size: 18px;
   line-height: 1.05;
-  color: #05603a;
+  color: #78350f;
   white-space: nowrap;
 }
-.brand-lockup small { display: block; font-size: 10px; font-weight: 800; color: var(--muted); line-height: 1.1; white-space: nowrap; }
+.brand-lockup small { display: block; font-size: 10px; font-weight: 800; color: #b45309; line-height: 1.1; white-space: nowrap; }
 
 .topbar-currencies { display: flex; align-items: center; gap: 6px; }
 
@@ -200,15 +200,15 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   width: 35px;
   height: 35px;
   border-radius: 50%;
-  background: linear-gradient(180deg, #ffffff 0%, #e3f9ee 100%);
-  border: 2px solid #8ad3ac;
-  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #7cd4a6;
-  color: #05603a;
+  background: linear-gradient(180deg, #ffffff 0%, #fef3c7 100%);
+  border: 2px solid #f59e0b;
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #d97706;
+  color: #78350f;
   cursor: pointer;
   flex-shrink: 0;
   transition: transform 0.1s ease;
 }
-.topbar-icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #7cd4a6; }
+.topbar-icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #d97706; }
 
 .topbar-profile-pill {
   display: inline-flex;
@@ -1800,11 +1800,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
     max-width: 490px;
     margin: 0 auto;
     z-index: 40;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(242, 253, 247, 0.96) 100%);
-    border: 2.5px solid #7cd4a6;
+    background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
+    border: 2.5px solid #b45309;
     border-radius: 28px;
     padding: 5px 6px;
-    box-shadow: inset 0 2px 0 #ffffff, 0 5px 0 #5bc28c, 0 14px 28px rgba(11, 61, 40, 0.16);
+    box-shadow: inset 0 2px 0 #ffffff, 0 5px 0 #78350f, 0 14px 28px rgba(69, 26, 3, 0.22);
   }
   .mob-nav-btn {
     background: transparent;
@@ -1814,11 +1814,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 4px 3px;
+    gap: 2px;
+    padding: 3px 2px;
     border-radius: 20px;
     font: inherit;
-    color: #64748b;
+    color: #78350f;
     cursor: pointer;
     transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease;
   }
@@ -1830,24 +1830,29 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   }
   .mob-nav-btn small {
     font-family: 'Fredoka', sans-serif;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 800;
     line-height: 1;
     white-space: nowrap;
     letter-spacing: 0.01em;
+    color: #78350f;
   }
   .mob-nav-btn.active {
     color: #ffffff;
     background: linear-gradient(180deg, #10b981 0%, #059669 100%);
     border-color: #047857;
-    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), 0 3.5px 0 #047857, 0 8px 16px rgba(4, 120, 87, 0.28);
-    transform: translateY(-1px);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 3.5px 0 #047857, 0 8px 16px rgba(4, 120, 87, 0.35);
+    transform: translateY(-2px);
   }
   .mob-nav-btn.active span {
-    transform: scale(1.08);
+    transform: scale(1.1);
+  }
+  .mob-nav-btn.active small {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(4, 120, 87, 0.6);
   }
   .mob-nav-btn.active svg {
-    filter: drop-shadow(0 1.5px 2px rgba(4, 120, 87, 0.4));
+    filter: drop-shadow(0 2px 3px rgba(4, 120, 87, 0.5));
   }
 
   .mob-hub-backdrop {
@@ -1899,13 +1904,24 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 }
 
 @media (max-width: 480px) {
-  .app-topbar { padding: 6px calc(10px + var(--safe-r)) 6px calc(10px + var(--safe-l)); gap: 5px; }
-  .brand-lockup strong { font-size: 16px; }
-  .topbar-actions { margin-left: auto; }
-  .topbar-currencies { order: 3; width: 100%; justify-content: flex-start; padding-top: 3px; border-top: 1px solid #d5f2e1; }
-  .wallet-chip { padding: 2px 8px 2px 5px; font-size: 11.5px; }
-  .topbar-icon-btn { width: 30px; height: 30px; }
-  .topbar-profile-pill { max-width: 118px; font-size: 11px; }
+  .app-topbar {
+    padding: 6px calc(10px + var(--safe-r)) 6px calc(10px + var(--safe-l));
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  .brand-lockup strong { font-size: 15px; }
+  .topbar-currencies {
+    order: 0;
+    width: auto;
+    padding-top: 0;
+    border-top: none;
+    margin-left: auto;
+    gap: 4px;
+  }
+  .wallet-chip { padding: 3px 7px 3px 5px; font-size: 11.5px; }
+  .topbar-actions { margin-left: 0; gap: 4px; }
+  .topbar-icon-btn { width: 32px; height: 32px; }
+  .topbar-profile-pill { max-width: 105px; font-size: 11px; }
   .panel { padding: 10px 11px; border-radius: 18px; }
   .hero-card h2 { font-size: 20px; }
   .xp-row { margin: 5px 0 7px; }
@@ -2575,8 +2591,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 .journey-world-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
+  gap: 4px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(241, 245, 249, 0.92) 100%);
   border: 2px solid #cbd5e1;
@@ -2585,7 +2601,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   font-size: 13px;
   font-weight: 800;
   color: #1e293b;
-  max-width: 220px;
+  max-width: 175px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 .journey-world-pill span {
   white-space: nowrap;
@@ -2612,8 +2630,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 40px;
-  padding: 0 42px 0 14px;
+  height: 38px;
+  padding: 0 40px 0 14px;
   border-radius: 999px;
   background: linear-gradient(180deg, #78350f 0%, #542203 55%, #361401 100%);
   border: 2.5px solid #b45309;
@@ -2624,6 +2642,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   color: #fef08a;
   text-shadow: 0 1.5px 0 #451a03;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.journey-coin-badge span {
+  white-space: nowrap;
+  line-height: 1;
+  display: inline-block;
 }
 .journey-coin-medallion {
   position: absolute;
@@ -2658,39 +2683,33 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  min-height: 1320px;
-  background:
-    radial-gradient(ellipse 70% 30% at 75% 65%, rgba(6, 182, 212, 0.9) 0%, rgba(2, 132, 199, 0.8) 45%, transparent 65%),
-    radial-gradient(circle at 20% 40%, rgba(6, 182, 212, 0.75) 0%, transparent 45%),
-    radial-gradient(ellipse 80% 50% at 30% 85%, #22c55e 0%, transparent 60%),
-    radial-gradient(ellipse 90% 60% at 80% 35%, #16a34a 0%, transparent 65%),
-    radial-gradient(ellipse 70% 50% at 20% 15%, #4ade80 0%, transparent 60%),
-    linear-gradient(180deg, #15803d 0%, #166534 35%, #14532d 70%, #052e16 100%);
+  min-height: 740px;
+  background: #064e3b;
   box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.25);
 }
 
-.journey-lake-overlay {
+.journey-landscape-svg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  background-image:
-    radial-gradient(ellipse 190px 440px at 72% 64%, rgba(6, 182, 212, 0.88) 0%, rgba(2, 132, 199, 0.75) 45%, transparent 68%),
-    radial-gradient(ellipse 150px 320px at 28% 36%, rgba(6, 182, 212, 0.8) 0%, rgba(3, 105, 161, 0.65) 50%, transparent 70%);
-  opacity: 0.92;
+  z-index: 1;
 }
 
-/* Floating cloud layers */
+/* Floating cloud layers matching alpine reference */
 .journey-cloud {
   position: absolute;
-  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.75) 55%, transparent 75%);
-  filter: blur(1.5px);
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.72) 55%, transparent 75%);
+  filter: blur(2px);
   pointer-events: none;
   z-index: 8;
   border-radius: 50%;
 }
-.journey-cloud.c1 { width: 230px; height: 95px; top: 140px; left: -40px; opacity: 0.85; }
-.journey-cloud.c2 { width: 270px; height: 115px; top: 560px; right: -50px; opacity: 0.82; }
-.journey-cloud.c3 { width: 250px; height: 105px; top: 920px; left: -30px; opacity: 0.88; }
+.journey-cloud.c1 { width: 220px; height: 90px; top: 15px; left: -30px; opacity: 0.88; }
+.journey-cloud.c2 { width: 240px; height: 100px; top: 200px; right: -40px; opacity: 0.85; }
+.journey-cloud.c3 { width: 210px; height: 85px; top: 440px; left: -30px; opacity: 0.82; }
+.journey-cloud.c4 { width: 220px; height: 95px; top: 600px; right: -30px; opacity: 0.88; }
 
 /* SVG Road overlay */
 .journey-road-svg {
@@ -2726,18 +2745,18 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 
 /* Level 1: Big Warm Gold 3D Pedestal */
 .journey-node-gold {
-  width: 74px;
-  height: 70px;
+  width: 76px;
+  height: 72px;
   border-radius: 24px;
-  background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 50%, #d97706 100%);
+  background: linear-gradient(180deg, #fde047 0%, #f59e0b 50%, #d97706 100%);
   border: 3.5px solid #fef08a;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 7px 0 #853d07, 0 14px 22px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 8px 0 #78350f, 0 16px 24px rgba(0, 0, 0, 0.35);
   display: grid;
   place-items: center;
 }
 .journey-node-gold strong {
   font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 40px;
+  font-size: 42px;
   font-weight: 900;
   line-height: 1;
   color: #6b2608;
@@ -2748,16 +2767,16 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 .journey-node-stone {
   width: 68px;
   height: 62px;
-  border-radius: 20px;
+  border-radius: 22px;
   background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #cbd5e1 100%);
-  border: 3px solid #ffffff;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 6px 0 #64748b, 0 12px 18px rgba(0, 0, 0, 0.28);
+  border: 3.5px solid #ffffff;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 6px 0 #64748b, 0 14px 20px rgba(0, 0, 0, 0.28);
   display: grid;
   place-items: center;
 }
 .journey-node-stone strong {
   font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 33px;
+  font-size: 34px;
   font-weight: 900;
   line-height: 1;
   color: #64748b;

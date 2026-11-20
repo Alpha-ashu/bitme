@@ -18,33 +18,30 @@ interface StageDef {
 
 interface MapSlot {
   x: number; // in 0..400 viewBox
-  y: number; // in 0..1320 viewBox
+  y: number; // in 0..740 viewBox
   dots: Array<{ x: number; y: number }>;
 }
 
 const MAP_SLOTS: MapSlot[] = [
-  { x: 145, y: 1205, dots: [{ x: 215, y: 1155 }, { x: 275, y: 1095 }] },
-  { x: 315, y: 1015, dots: [{ x: 240, y: 965 }, { x: 160, y: 925 }] },
-  { x: 95, y: 855, dots: [{ x: 165, y: 795 }, { x: 240, y: 745 }] },
-  { x: 315, y: 675, dots: [{ x: 245, y: 615 }, { x: 170, y: 575 }] },
-  { x: 110, y: 495, dots: [{ x: 180, y: 435 }, { x: 250, y: 395 }] },
-  { x: 305, y: 325, dots: [{ x: 235, y: 265 }, { x: 165, y: 225 }] },
-  { x: 105, y: 165, dots: [{ x: 175, y: 115 }, { x: 245, y: 70 }] },
-  { x: 295, y: 25, dots: [] },
+  { x: 165, y: 625, dots: [{ x: 215, y: 580 }, { x: 260, y: 535 }, { x: 285, y: 495 }] },
+  { x: 290, y: 460, dots: [{ x: 235, y: 420 }, { x: 165, y: 395 }] },
+  { x: 100, y: 365, dots: [{ x: 160, y: 320 }, { x: 235, y: 285 }] },
+  { x: 290, y: 255, dots: [{ x: 250, y: 205 }] },
+  { x: 195, y: 175, dots: [{ x: 135, y: 145 }] },
+  { x: 85, y: 130, dots: [{ x: 65, y: 85 }] },
 ];
 
 const BEZIER_PATH_FULL =
-  'M 145 1205 C 180 1180, 280 1130, 315 1015 C 330 930, 120 940, 95 855 C 80 780, 290 770, 315 675 C 330 600, 130 590, 110 495 C 90 420, 280 410, 305 325 C 320 250, 120 240, 105 165 C 90 90, 270 90, 295 25';
+  'M 165 625 C 180 555, 280 535, 290 460 C 300 380, 135 410, 100 365 C 75 295, 265 315, 290 255 C 300 205, 240 195, 195 175 C 165 155, 115 150, 85 130 C 65 110, 50 60, 50 0';
 
 // Segment subpaths for completed progression
 const BEZIER_SEGMENTS: string[] = [
-  'M 145 1205 C 180 1180, 280 1130, 315 1015',
-  'M 315 1015 C 330 930, 120 940, 95 855',
-  'M 95 855 C 80 780, 290 770, 315 675',
-  'M 315 675 C 330 600, 130 590, 110 495',
-  'M 110 495 C 90 420, 280 410, 305 325',
-  'M 305 325 C 320 250, 120 240, 105 165',
-  'M 105 165 C 90 90, 270 90, 295 25',
+  'M 165 625 C 180 555, 280 535, 290 460',
+  'M 290 460 C 300 380, 135 410, 100 365',
+  'M 100 365 C 75 295, 265 315, 290 255',
+  'M 290 255 C 300 205, 240 195, 195 175',
+  'M 195 175 C 165 155, 115 150, 85 130',
+  'M 85 130 C 65 110, 50 60, 50 0',
 ];
 
 export function renderAdventureJourneyMap(ctx: AppContext): string {
@@ -69,7 +66,7 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
     return {
       levelNumber: defaultNum,
       title: `Stage ${defaultNum}`,
-      isBossCheckpoint: (i + 1) % 5 === 0,
+      isBossCheckpoint: (i + 1) % 10 === 0,
       unlocked: defaultNum <= highestLvl,
       completed: defaultNum < highestLvl,
       targetScore: 1000 + (i + 1) * 250,
@@ -116,44 +113,85 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
       <!-- Scrollable Continuous Trail Map Canvas -->
       <div class="journey-map-scroll" id="journey-map-scroll">
         <div class="journey-map-canvas">
-          <!-- Background Scenic Lake & River Overlays -->
-          <div class="journey-lake-overlay"></div>
+          <!-- Alpine Mountain Valley & Turquoise Glacial Lake Landscape Artwork -->
+          <svg class="journey-landscape-svg" viewBox="0 0 400 740" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="grassSlope" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#34d399"/>
+                <stop offset="22%" stop-color="#10b981"/>
+                <stop offset="55%" stop-color="#059669"/>
+                <stop offset="85%" stop-color="#047857"/>
+                <stop offset="100%" stop-color="#064e3b"/>
+              </linearGradient>
+              <linearGradient id="fjordWater" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#67e8f9"/>
+                <stop offset="30%" stop-color="#06b6d4"/>
+                <stop offset="70%" stop-color="#0284c7"/>
+                <stop offset="100%" stop-color="#0369a1"/>
+              </linearGradient>
+              <radialGradient id="pineCluster" cx="40%" cy="30%" r="65%">
+                <stop offset="0%" stop-color="#065f46"/>
+                <stop offset="100%" stop-color="#022c22"/>
+              </radialGradient>
+            </defs>
 
-          <!-- Floating Clouds (Top-altitude Depth Atmosphere) -->
+            <!-- Rolling Alpine Slopes Base -->
+            <rect width="400" height="740" fill="url(#grassSlope)"/>
+
+            <!-- Lower Glacial Mountain Lake (Framing Node 1 & 2) -->
+            <path d="M-15 480 C35 480, 85 520, 95 580 C105 640, 50 710, -15 730 Z" fill="url(#fjordWater)" opacity="0.92"/>
+            <path d="M-15 480 C35 480, 85 520, 95 580 C105 640, 50 710, -15 730 Z" fill="none" stroke="#a5f3fc" stroke-width="3" opacity="0.6"/>
+            <path d="M5 520 C35 540, 65 580, 75 640" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+
+            <!-- Upper Glacial Fjord (Winding between Node 2, 3, and 4) -->
+            <path d="M415 220 C320 230, 260 270, 215 310 C165 355, 110 365, -15 355 L-15 415 C60 430, 140 425, 200 385 C260 345, 330 325, 415 335 Z" fill="url(#fjordWater)" opacity="0.95"/>
+            <path d="M415 220 C320 230, 260 270, 215 310 C165 355, 110 365, -15 355 L-15 415 C60 430, 140 425, 200 385 C260 345, 330 325, 415 335 Z" fill="none" stroke="#a5f3fc" stroke-width="3.5" opacity="0.65"/>
+            <path d="M30 385 Q110 380 170 375" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+            <path d="M240 335 Q295 310 375 295" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+
+            <!-- Pine Foliage Clusters on Slopes -->
+            <ellipse cx="60" cy="270" rx="42" ry="26" fill="url(#pineCluster)" opacity="0.45"/>
+            <ellipse cx="340" cy="490" rx="55" ry="32" fill="url(#pineCluster)" opacity="0.5"/>
+            <ellipse cx="320" cy="110" rx="48" ry="28" fill="url(#pineCluster)" opacity="0.42"/>
+            <ellipse cx="40" cy="90" rx="36" ry="22" fill="url(#pineCluster)" opacity="0.4"/>
+          </svg>
+
+          <!-- Floating Clouds (Top-altitude Depth Atmosphere matching reference) -->
           <div class="journey-cloud c1"></div>
           <div class="journey-cloud c2"></div>
           <div class="journey-cloud c3"></div>
+          <div class="journey-cloud c4"></div>
 
           <!-- SVG Ribbon Road Layer -->
-          <svg class="journey-road-svg" viewBox="0 0 400 1320" preserveAspectRatio="none" aria-hidden="true">
+          <svg class="journey-road-svg" viewBox="0 0 400 740" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="roadTerracotta" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#ea7a28"/>
-                <stop offset="50%" stop-color="#c25e1a"/>
-                <stop offset="100%" stop-color="#9a3412"/>
+                <stop offset="0%" stop-color="#f97316"/>
+                <stop offset="50%" stop-color="#ea580c"/>
+                <stop offset="100%" stop-color="#c2410c"/>
               </linearGradient>
               <linearGradient id="roadStone" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#ffffff"/>
-                <stop offset="45%" stop-color="#f1f5f9"/>
+                <stop offset="45%" stop-color="#f8fafc"/>
                 <stop offset="100%" stop-color="#cbd5e1"/>
               </linearGradient>
               <filter id="roadShadow" x="-10%" y="-10%" width="120%" height="120%">
-                <feDropShadow dx="0" dy="6" stdDeviation="4" flood-color="rgba(0,0,0,0.35)"/>
+                <feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="rgba(0,0,0,0.35)"/>
               </filter>
             </defs>
 
             <!-- Bottom Extrusion Shadow for full trail -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(0, 0, 0, 0.38)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" transform="translate(0, 6)"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(0, 0, 0, 0.35)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" transform="translate(0, 5)"/>
 
             <!-- White Paved Stone Road for upcoming / locked section -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="url(#roadStone)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#ffffff" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#94a3b8" stroke-width="3.2" stroke-dasharray="10 8" stroke-linecap="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="url(#roadStone)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#94a3b8" stroke-width="3" stroke-dasharray="9 7" stroke-linecap="round"/>
 
             <!-- Completed Terracotta Dirt Road Section (from Level 1 up to current level) -->
             ${completedSegments.map(seg => `
-              <path d="${seg}" fill="none" stroke="url(#roadTerracotta)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="${seg}" fill="none" stroke="#fef08a" stroke-width="3.2" stroke-dasharray="10 8" stroke-linecap="round"/>
+              <path d="${seg}" fill="none" stroke="url(#roadTerracotta)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="${seg}" fill="none" stroke="#fef08a" stroke-width="3" stroke-dasharray="9 7" stroke-linecap="round"/>
             `).join('')}
           </svg>
 
@@ -179,7 +217,7 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
             const leftPct = (slot.x / 400) * 100;
             const topPx = slot.y;
             const isFirst = idx === 0;
-            const isBoss = lvl.isBossCheckpoint || (lvl.levelNumber % 5 === 0);
+            const isBoss = lvl.isBossCheckpoint || (lvl.levelNumber % 10 === 0);
             const isUnlocked = lvl.unlocked || lvl.levelNumber <= highestLvl;
             const isCompleted = lvl.completed || lvl.levelNumber < highestLvl;
 

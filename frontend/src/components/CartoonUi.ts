@@ -273,155 +273,307 @@ export function svgAccessoryPreview(accId: string, size = 56): string {
 
 export function svgNavIcon(
   kind: 'home' | 'play' | 'story' | 'lobby' | 'hub' | 'inventory' | 'settings' | 'missions' | 'leaderboard' | 'rewards' | 'social' | 'events' | 'profile',
-  size = 22
+  size = 24
 ): string {
+  const uid = `nav_${kind}_${++svgUid}`;
   switch (kind) {
     case 'home':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Castle Turrets & Fortress Walls -->
-        <path d="M3 21V9.5l2-1.5v2h2v-3l2-1v4h6v-4l2 1v3h2v-2l2 1.5V21H3z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <!-- Central Portcullis / Arched Castle Gate -->
-        <path d="M10 21v-4a2 2 0 0 1 4 0v4" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-        <!-- Royal Pennant Flag on Central Spire -->
-        <path d="M12 6V1.5l3.5 1.75L12 5" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-        <!-- Stone Arrow Slits / Windows -->
-        <rect x="6.5" y="12" width="1.5" height="3" rx="0.75" fill="currentColor"/>
-        <rect x="16" y="12" width="1.5" height="3" rx="0.75" fill="currentColor"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.22))">
+        <defs>
+          <linearGradient id="${uid}_wall" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="45%" stop-color="#f1f5f9"/>
+            <stop offset="100%" stop-color="#cbd5e1"/>
+          </linearGradient>
+          <linearGradient id="${uid}_roof" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f87171"/>
+            <stop offset="50%" stop-color="#ef4444"/>
+            <stop offset="100%" stop-color="#b91c1c"/>
+          </linearGradient>
+          <linearGradient id="${uid}_gate" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#b45309"/>
+            <stop offset="100%" stop-color="#78350f"/>
+          </linearGradient>
+        </defs>
+        <!-- Fortress Base Shadow -->
+        <ellipse cx="16" cy="28.5" rx="12" ry="2.5" fill="rgba(0,0,0,0.25)"/>
+        <!-- Main Stone Wall & Towers -->
+        <path d="M4 27 L4 13 L8 13 L8 16 L12 16 L12 12 L20 12 L20 16 L24 16 L24 13 L28 13 L28 27 Z" fill="url(#${uid}_wall)" stroke="#334155" stroke-width="1.8" stroke-linejoin="round"/>
+        <!-- Conical Turret Roofs -->
+        <polygon points="3,13 6,5.5 9,13" fill="url(#${uid}_roof)" stroke="#991b1b" stroke-width="1.4" stroke-linejoin="round"/>
+        <polygon points="23,13 26,5.5 29,13" fill="url(#${uid}_roof)" stroke="#991b1b" stroke-width="1.4" stroke-linejoin="round"/>
+        <polygon points="11,12 16,3 21,12" fill="url(#${uid}_roof)" stroke="#991b1b" stroke-width="1.6" stroke-linejoin="round"/>
+        <!-- Golden Pennant Flag -->
+        <path d="M16 3 L16 0.8 L21.5 2.2 L16 3.6" fill="#facc15" stroke="#b45309" stroke-width="0.8" stroke-linejoin="round"/>
+        <!-- Arched Castle Gate -->
+        <path d="M13 27 V20 Q16 17 19 20 V27 Z" fill="url(#${uid}_gate)" stroke="#451a03" stroke-width="1.6"/>
+        <line x1="16" y1="18.5" x2="16" y2="27" stroke="#451a03" stroke-width="1.2"/>
+        <circle cx="14.5" cy="23.5" r="0.75" fill="#fde047"/>
+        <!-- Arrow Slit Windows -->
+        <rect x="5.5" y="18" width="2" height="3.5" rx="1" fill="#1e293b"/>
+        <rect x="24.5" y="18" width="2" height="3.5" rx="1" fill="#1e293b"/>
+        <circle cx="16" cy="15" r="1.2" fill="#1e293b"/>
       </svg>`;
 
     case 'play':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Ergonomic Video Gamepad Body -->
-        <path d="M7 6h10a4.5 4.5 0 0 1 4.4 5.3l-1.2 6.4a3 3 0 0 1-2.9 2.3h-.3a3 3 0 0 1-2.9-2.2l-.6-2.1a1.2 1.2 0 0 0-1.1-.9H10.6a1.2 1.2 0 0 0-1.1.9l-.6 2.1a3 3 0 0 1-2.9 2.2h-.3a3 3 0 0 1-2.9-2.3L1.6 11.3A4.5 4.5 0 0 1 7 6z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- Directional D-Pad Cross on Left Grip -->
-        <path d="M7 10v4M5 12h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-        <!-- 4 Action Buttons in Diamond Formation on Right Grip -->
-        <circle cx="17" cy="10.5" r="1.1" fill="currentColor"/>
-        <circle cx="15.5" cy="12" r="1.1" fill="currentColor"/>
-        <circle cx="18.5" cy="12" r="1.1" fill="currentColor"/>
-        <circle cx="17" cy="13.5" r="1.1" fill="currentColor"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(2,132,199,0.3))">
+        <defs>
+          <linearGradient id="${uid}_pad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#38bdf8"/>
+            <stop offset="30%" stop-color="#0284c7"/>
+            <stop offset="100%" stop-color="#0369a1"/>
+          </linearGradient>
+        </defs>
+        <!-- Gamepad Base Shadow -->
+        <ellipse cx="16" cy="27" rx="12" ry="2.8" fill="rgba(0,0,0,0.22)"/>
+        <!-- Ergonomic Controller Body -->
+        <path d="M9 8 H23 C27 8 29.5 11 28.5 16 L27 23 C26.2 25.5 23.5 26.5 21 25 L18 23.2 C17.2 22.7 14.8 22.7 14 23.2 L11 25 C8.5 26.5 5.8 25.5 5 23 L3.5 16 C2.5 11 5 8 9 8 Z" fill="url(#${uid}_pad)" stroke="#0c4a6e" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Gloss Top Highlight -->
+        <path d="M10 10 H22 C24.5 10 26 11.5 25.5 13.5 C23 11.8 19 11.2 16 11.2 C13 11.2 9 11.8 6.5 13.5 C6 11.5 7.5 10 10 10 Z" fill="#ffffff" opacity="0.45"/>
+        <!-- Directional D-Pad on Left -->
+        <path d="M8.5 13 H11.5 V15 H13.5 V18 H11.5 V20 H8.5 V18 H6.5 V15 H8.5 Z" fill="#0f172a" stroke="#0284c7" stroke-width="0.8"/>
+        <!-- Candy Action Buttons on Right -->
+        <circle cx="21" cy="14" r="1.6" fill="#ef4444" stroke="#7f1d1d" stroke-width="0.8"/>
+        <circle cx="24.5" cy="16.5" r="1.6" fill="#10b981" stroke="#064e3b" stroke-width="0.8"/>
+        <circle cx="17.5" cy="16.5" r="1.6" fill="#facc15" stroke="#78350f" stroke-width="0.8"/>
+        <circle cx="21" cy="19" r="1.6" fill="#38bdf8" stroke="#0369a1" stroke-width="0.8"/>
         <!-- Dual Analog Thumbsticks -->
-        <circle cx="10" cy="15" r="1.4" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.2"/>
-        <circle cx="14" cy="15" r="1.4" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="13" cy="19" r="2.2" fill="#1e293b" stroke="#0f172a" stroke-width="1"/>
+        <circle cx="13" cy="18.5" r="1.1" fill="#475569"/>
       </svg>`;
 
     case 'story':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Quest Tome Cover & Spine -->
-        <path d="M4.5 19.5V4.8A2.3 2.3 0 0 1 6.8 2.5H19a1 1 0 0 1 1 1v15.2a1 1 0 0 1-1 1H6.8a2.3 2.3 0 0 0-2.3 2.3v0a.5.5 0 0 1-1-.5z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <!-- Gilded Corner Reinforcements -->
-        <path d="M16 2.5h3v3M16 19.7h3v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- Embossed Adventure Star on Cover -->
-        <path d="M12.5 7.2l1.1 2.3 2.5.4-1.8 1.8.4 2.5-2.2-1.2-2.2 1.2.4-2.5-1.8-1.8 2.5-.4L12.5 7.2z" fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linejoin="round"/>
-        <!-- Silken Quest Ribbon Bookmark dangling out the bottom -->
-        <path d="M9 2.5v7.5l1.8-1.3 1.8 1.3V2.5" fill="currentColor" fill-opacity="0.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- Page Ridge -->
-        <path d="M6.8 19.7H19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(120,53,15,0.3))">
+        <defs>
+          <linearGradient id="${uid}_map" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fffbeb"/>
+            <stop offset="45%" stop-color="#fef08a"/>
+            <stop offset="100%" stop-color="#fde047"/>
+          </linearGradient>
+          <linearGradient id="${uid}_roll" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#b45309"/>
+            <stop offset="100%" stop-color="#78350f"/>
+          </linearGradient>
+        </defs>
+        <!-- Drop Shadow -->
+        <ellipse cx="16" cy="27" rx="11" ry="2.5" fill="rgba(0,0,0,0.22)"/>
+        <!-- Parchment Scroll Body -->
+        <path d="M5 6 C5 4 8 4 10 4 H24 C26.5 4 27.5 5.5 27 7.5 L24.5 24 C24 26 22 26.5 19.5 26.5 H6 C3.5 26.5 3 24.5 3.5 22.5 L5 6 Z" fill="url(#${uid}_map)" stroke="#92400e" stroke-width="1.8" stroke-linejoin="round"/>
+        <!-- Rolled Edges -->
+        <path d="M5 6 C5 4 8 4 10 4 C7 6 7 8 5 9 Z" fill="url(#${uid}_roll)"/>
+        <path d="M22 26.5 C24.5 26.5 25.5 25 25 23 C23 24 21 24.5 19.5 26.5 Z" fill="url(#${uid}_roll)"/>
+        <!-- Dotted Crimson Trail -->
+        <path d="M8 20 Q12 14 16 17 Q20 20 22 13" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="2 2" stroke-linecap="round"/>
+        <!-- Crimson Treasure X -->
+        <path d="M20.5 11.5 L24.5 15.5 M24.5 11.5 L20.5 15.5" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/>
+        <!-- Golden Compass Rose Star -->
+        <polygon points="12,8 13.2,11 16.2,11.5 13.8,13.5 14.5,16.5 12,14.8 9.5,16.5 10.2,13.5 7.8,11.5 10.8,11" fill="#f59e0b" stroke="#b45309" stroke-width="0.8"/>
+        <!-- Royal Red Wax Seal -->
+        <circle cx="7.5" cy="22.5" r="3" fill="#ef4444" stroke="#991b1b" stroke-width="1"/>
+        <circle cx="7.5" cy="22.5" r="1.4" fill="#facc15"/>
       </svg>`;
 
     case 'lobby':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Tournament Combat Shield Base -->
-        <path d="M12 21.5s7.5-3.8 7.5-9.5V5.5l-7.5-3-7.5 3V12c0 5.7 7.5 9.5 7.5 9.5z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <!-- Crossed Battle Sword 1 (TL to BR) -->
-        <line x1="7.5" y1="7.5" x2="16.5" y2="16.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-        <line x1="6.2" y1="9" x2="9" y2="6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        <circle cx="5.8" cy="9.4" r="0.9" fill="currentColor"/>
-        <!-- Crossed Battle Sword 2 (TR to BL) -->
-        <line x1="16.5" y1="7.5" x2="7.5" y2="16.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-        <line x1="17.8" y1="9" x2="15" y2="6.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        <circle cx="18.2" cy="9.4" r="0.9" fill="currentColor"/>
-        <!-- Central Arena Star Pip -->
-        <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(180,83,9,0.3))">
+        <defs>
+          <linearGradient id="${uid}_shield" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fef08a"/>
+            <stop offset="50%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#b45309"/>
+          </linearGradient>
+          <linearGradient id="${uid}_crest" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#38bdf8"/>
+            <stop offset="100%" stop-color="#0284c7"/>
+          </linearGradient>
+          <linearGradient id="${uid}_blade" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="50%" stop-color="#cbd5e1"/>
+            <stop offset="100%" stop-color="#64748b"/>
+          </linearGradient>
+        </defs>
+        <!-- Shadow -->
+        <ellipse cx="16" cy="28" rx="10" ry="2.2" fill="rgba(0,0,0,0.25)"/>
+        <!-- Crossed Sword 1 (TL to BR) -->
+        <line x1="5" y1="5" x2="27" y2="27" stroke="url(#${uid}_blade)" stroke-width="2.6" stroke-linecap="round"/>
+        <line x1="3" y1="7" x2="7" y2="3" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="2.5" cy="7.5" r="1.2" fill="#f59e0b" stroke="#78350f" stroke-width="0.8"/>
+        <!-- Crossed Sword 2 (TR to BL) -->
+        <line x1="27" y1="5" x2="5" y2="27" stroke="url(#${uid}_blade)" stroke-width="2.6" stroke-linecap="round"/>
+        <line x1="29" y1="7" x2="25" y2="3" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="29.5" cy="7.5" r="1.2" fill="#f59e0b" stroke="#78350f" stroke-width="0.8"/>
+        <!-- Golden Knight Tournament Shield Base -->
+        <path d="M16 28 C23 24 25.5 17 25.5 11 L16 7 L6.5 11 C6.5 17 9 24 16 28 Z" fill="url(#${uid}_shield)" stroke="#78350f" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Azure Crest Inner Inlay -->
+        <path d="M16 24 C20.5 21 22 16 22 12.5 L16 9.5 L10 12.5 C10 16 11.5 21 16 24 Z" fill="url(#${uid}_crest)" stroke="#0369a1" stroke-width="1.2" stroke-linejoin="round"/>
+        <!-- Victory Star Inset -->
+        <polygon points="16,12.5 17.2,15 19.8,15.3 17.8,17 18.4,19.5 16,18.2 13.6,19.5 14.2,17 12.2,15.3 14.8,15" fill="#fef08a" stroke="#78350f" stroke-width="0.8"/>
       </svg>`;
 
     case 'hub':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Lower Chest Body -->
-        <rect x="3" y="11" width="18" height="9" rx="2" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <!-- Curved Domed Chest Lid -->
-        <path d="M3 11V8.5C3 5.5 6.5 4 12 4s9 1.5 9 4.5V11" fill="currentColor" fill-opacity="0.28" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(69,26,3,0.35))">
+        <defs>
+          <linearGradient id="${uid}_wood" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#b45309"/>
+            <stop offset="50%" stop-color="#92400e"/>
+            <stop offset="100%" stop-color="#78350f"/>
+          </linearGradient>
+          <linearGradient id="${uid}_gold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fef08a"/>
+            <stop offset="60%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#b45309"/>
+          </linearGradient>
+        </defs>
+        <!-- Drop Shadow -->
+        <ellipse cx="16" cy="27" rx="11" ry="2.6" fill="rgba(0,0,0,0.25)"/>
+        <!-- Chest Body (Lower) -->
+        <rect x="4" y="14" width="24" height="12" rx="3" fill="url(#${uid}_wood)" stroke="#451a03" stroke-width="2"/>
+        <!-- Chest Domed Lid (Curved Arch) -->
+        <path d="M4 14 C4 8 8 5 16 5 C24 5 28 8 28 14 Z" fill="url(#${uid}_wood)" stroke="#451a03" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Golden Reinforcement Trim Bands -->
+        <line x1="9" y1="6" x2="9" y2="25.5" stroke="url(#${uid}_gold)" stroke-width="2.6"/>
+        <line x1="23" y1="6" x2="23" y2="25.5" stroke="url(#${uid}_gold)" stroke-width="2.6"/>
+        <!-- Gold Coins & Diamonds Spilling from Inside -->
+        <circle cx="12" cy="13.5" r="2.2" fill="#fde047" stroke="#78350f" stroke-width="0.8"/>
+        <circle cx="20" cy="13.5" r="2.2" fill="#fde047" stroke="#78350f" stroke-width="0.8"/>
+        <polygon points="16,11 18,13.5 16,16 14,13.5" fill="#38bdf8" stroke="#0284c7" stroke-width="0.8"/>
         <!-- Center Golden Clasp Lock Plate -->
-        <rect x="10" y="10" width="4" height="4.5" rx="1.2" fill="currentColor" stroke="currentColor" stroke-width="1.2"/>
-        <circle cx="12" cy="12" r="0.8" fill="#ffffff"/>
-        <!-- Vertical Iron Reinforcing Straps with Rivets -->
-        <line x1="7" y1="4.8" x2="7" y2="20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-        <line x1="17" y1="4.8" x2="17" y2="20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <rect x="13.5" y="13" width="5" height="6.5" rx="1.5" fill="url(#${uid}_gold)" stroke="#78350f" stroke-width="1.2"/>
+        <circle cx="16" cy="16" r="1.1" fill="#451a03"/>
       </svg>`;
 
     case 'inventory':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Armory Knight Helmet -->
-        <path d="M12 2a8 8 0 0 0-8 8v4c0 4.4 3.6 8 8 8s8-3.6 8-8v-4a8 8 0 0 0-8-8z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <!-- Helmet Visor Slit -->
-        <path d="M5 11h14M7 14h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <!-- Center Crest Comb / Plume -->
-        <path d="M12 2v6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.25))">
+        <defs>
+          <linearGradient id="${uid}_helm" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="50%" stop-color="#cbd5e1"/>
+            <stop offset="100%" stop-color="#64748b"/>
+          </linearGradient>
+          <linearGradient id="${uid}_plume" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#c084fc"/>
+            <stop offset="100%" stop-color="#7e22ce"/>
+          </linearGradient>
+        </defs>
+        <!-- Knight Plume -->
+        <path d="M16 2 C13 5 11 8 13 11 C15 7 17 5 19 3 Z" fill="url(#${uid}_plume)" stroke="#581c87" stroke-width="1"/>
+        <!-- Helmet Base -->
+        <path d="M16 5 C9 5 8 11 8 18 C8 24 11 27 16 27 C21 27 24 24 24 18 C24 11 23 5 16 5 Z" fill="url(#${uid}_helm)" stroke="#1e293b" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Visor Slit -->
+        <rect x="10" y="14" width="12" height="3" rx="1.2" fill="#0f172a" stroke="#f59e0b" stroke-width="1"/>
+        <circle cx="16" cy="15.5" r="0.75" fill="#facc15"/>
+        <circle cx="9.5" cy="18" r="1.5" fill="#f59e0b"/>
+        <circle cx="22.5" cy="18" r="1.5" fill="#f59e0b"/>
       </svg>`;
 
     case 'missions':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.22))">
         <!-- Archery Bullseye Target with Arrow -->
-        <circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-width="2"/>
-        <circle cx="12" cy="12" r="5.5" stroke="currentColor" stroke-width="1.8"/>
-        <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
-        <path d="M12 12l7-7M19 5l-4 .5M19 5l-.5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="15" cy="17" r="12" fill="#ffffff" stroke="#ef4444" stroke-width="3"/>
+        <circle cx="15" cy="17" r="8" fill="#38bdf8" stroke="#0284c7" stroke-width="2"/>
+        <circle cx="15" cy="17" r="4.5" fill="#ef4444" stroke="#991b1b" stroke-width="1.6"/>
+        <circle cx="15" cy="17" r="2" fill="#fde047"/>
+        <!-- Arrow Struck In Bullseye -->
+        <line x1="15" y1="17" x2="27" y2="5" stroke="#78350f" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M25 4 L28 4 L28 7 Z" fill="#38bdf8" stroke="#0284c7" stroke-width="1"/>
       </svg>`;
 
     case 'leaderboard':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Tournament Trophy Cup with Champion Star -->
-        <path d="M6 3h12v6a6 6 0 0 1-12 0V3z" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <path d="M6 5H3.5a2.5 2.5 0 0 0 0 5H6M18 5h2.5a2.5 2.5 0 0 1 0 5H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        <path d="M12 15v3.5M8 21h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-        <path d="M12 6.5l.8 1.6 1.8.3-1.3 1.2.3 1.7-1.6-.8-1.6.8.3-1.7-1.3-1.2 1.8-.3L12 6.5z" fill="currentColor"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(180,83,9,0.3))">
+        <defs>
+          <linearGradient id="${uid}_gold" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fff9c4"/>
+            <stop offset="35%" stop-color="#fde047"/>
+            <stop offset="70%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#b45309"/>
+          </linearGradient>
+        </defs>
+        <!-- Handles -->
+        <path d="M8 7 H4 C2 7 2 15 8 16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M24 7 H28 C30 7 30 15 24 16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Trophy Cup -->
+        <path d="M7 5 H25 L23 16 C22 20 18 22 16 22 C14 22 10 20 9 16 Z" fill="url(#${uid}_gold)" stroke="#78350f" stroke-width="2" stroke-linejoin="round"/>
+        <!-- Stem & Base -->
+        <rect x="14" y="22" width="4" height="4" fill="#f59e0b" stroke="#78350f" stroke-width="1.5"/>
+        <rect x="9" y="26" width="14" height="4" rx="1.5" fill="#78350f" stroke="#451a03" stroke-width="1.5"/>
+        <!-- Victory Star -->
+        <polygon points="16,9 17.2,11.5 19.8,11.8 17.8,13.5 18.4,16 16,14.7 13.6,16 14.2,13.5 12.2,11.8 14.8,11.5" fill="#ffffff" stroke="#b45309" stroke-width="0.8"/>
       </svg>`;
 
     case 'rewards':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Wrapped Gift Box with Ribbon Bow -->
-        <rect x="3.5" y="8.5" width="17" height="12.5" rx="2" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-width="2"/>
-        <path d="M12 8.5V21M3.5 13H20.5" stroke="currentColor" stroke-width="2"/>
-        <path d="M12 8.5C9.5 8.5 7.5 5.5 9 3.8s3.5 1.5 3 4.7zm0 0c2.5 0 4.5-3 3-4.7s-3.5 1.5-3 4.7z" fill="currentColor" fill-opacity="0.45" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(185,28,28,0.3))">
+        <defs>
+          <linearGradient id="${uid}_gift" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f87171"/>
+            <stop offset="50%" stop-color="#ef4444"/>
+            <stop offset="100%" stop-color="#dc2626"/>
+          </linearGradient>
+          <linearGradient id="${uid}_rib" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fef08a"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+        </defs>
+        <!-- Shadow -->
+        <ellipse cx="16" cy="28" rx="11" ry="2.2" fill="rgba(0,0,0,0.22)"/>
+        <!-- Box Body -->
+        <rect x="5" y="12" width="22" height="15" rx="3" fill="url(#${uid}_gift)" stroke="#991b1b" stroke-width="2"/>
+        <!-- Box Lid -->
+        <rect x="3.5" y="8" width="25" height="5" rx="2" fill="url(#${uid}_gift)" stroke="#991b1b" stroke-width="2"/>
+        <!-- Satin Ribbon -->
+        <rect x="13.5" y="8" width="5" height="19" fill="url(#${uid}_rib)" stroke="#b45309" stroke-width="1.2"/>
+        <!-- Fluffy Ribbon Bow -->
+        <path d="M16 8 C12 3 9 4 11 7 C13 9 15 8 16 8 Z" fill="url(#${uid}_rib)" stroke="#b45309" stroke-width="1.2"/>
+        <path d="M16 8 C20 3 23 4 21 7 C19 9 17 8 16 8 Z" fill="url(#${uid}_rib)" stroke="#b45309" stroke-width="1.2"/>
+        <circle cx="16" cy="8" r="1.5" fill="#fde047"/>
       </svg>`;
 
     case 'social':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Dual Adventurers / Guild Party -->
-        <circle cx="9" cy="8" r="3.5" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
-        <path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <circle cx="16.5" cy="9.5" r="2.8" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M14.5 19a4 4 0 0 1 6-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.2))">
+        <!-- Dual Adventurers -->
+        <!-- Companion 1 (Left) -->
+        <circle cx="11" cy="11" r="5" fill="#fed7aa" stroke="#78350f" stroke-width="1.6"/>
+        <path d="M6 10 C6 7 9 6 11 6 C13 6 16 7 16 10 Z" fill="#b45309"/>
+        <path d="M4 26 C4 20 8 18 11 18 C14 18 18 20 18 26 Z" fill="#0284c7" stroke="#0369a1" stroke-width="1.8"/>
+        <!-- Companion 2 (Right, Foreground) -->
+        <circle cx="21" cy="13" r="5" fill="#fde047" stroke="#78350f" stroke-width="1.6"/>
+        <path d="M16 12 C16 9 19 8 21 8 C23 8 26 9 26 12 Z" fill="#ef4444"/>
+        <path d="M14 27 C14 21 18 19 21 19 C24 19 28 21 28 27 Z" fill="#10b981" stroke="#065f46" stroke-width="1.8"/>
       </svg>`;
 
     case 'events':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Magical Event Thunderbolt Gem -->
-        <path d="M13 2L4.5 13.5h6l-1.5 8.5L20 9.5h-6.5L13 2z" fill="currentColor" fill-opacity="0.28" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(234,88,12,0.3))">
+        <!-- Magical Event Thunderbolt -->
+        <polygon points="18,2 6,17 15,17 13,30 26,13 17,13" fill="#facc15" stroke="#b45309" stroke-width="2" stroke-linejoin="round"/>
+        <polygon points="17,5 8.5,16 15,16 13.8,25 22.5,14 16.5,14" fill="#ffffff" opacity="0.6"/>
       </svg>`;
 
     case 'profile':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Crowned Hero Character Silhouette -->
-        <circle cx="12" cy="11" r="4" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
-        <path d="M4.5 21a7.5 7.5 0 0 1 15 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <path d="M8.5 6.5l1.5-2.5 2 1.5 2-1.5 1.5 2.5H8.5z" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <circle cx="16" cy="12" r="6" fill="#fed7aa" stroke="#78350f" stroke-width="2"/>
+        <path d="M7 27 C7 20 11 18 16 18 C21 18 25 20 25 27 Z" fill="#0284c7" stroke="#0369a1" stroke-width="2"/>
       </svg>`;
 
     case 'settings':
-      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Mechanical Gaming Gear -->
-        <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2"/>
-        <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(120,53,15,0.25))">
+        <defs>
+          <linearGradient id="${uid}_gear" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fef08a"/>
+            <stop offset="50%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#b45309"/>
+          </linearGradient>
+        </defs>
+        <!-- Golden Mechanical Gear -->
+        <circle cx="16" cy="16" r="10" fill="url(#${uid}_gear)" stroke="#78350f" stroke-width="2.2"/>
+        <!-- Gear Teeth -->
+        <path d="M14 3 H18 V7 H14 Z M14 25 H18 V29 H14 Z M3 14 H7 V18 H3 Z M25 14 H29 V18 H25 Z M6.8 6.8 L9.6 9.6 L6.8 12.4 L4 9.6 Z M22.4 22.4 L25.2 25.2 L22.4 28 L19.6 25.2 Z M6.8 25.2 L9.6 22.4 L12.4 25.2 L9.6 28 Z M22.4 9.6 L25.2 6.8 L28 9.6 L25.2 12.4 Z" fill="#f59e0b" stroke="#78350f" stroke-width="1.2"/>
+        <circle cx="16" cy="16" r="4.5" fill="#451a03" stroke="#fef08a" stroke-width="1.5"/>
       </svg>`;
 
     default:
       return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <!-- Adventure Grid -->
-        <rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
-        <rect x="13.5" y="3.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="2"/>
-        <rect x="3.5" y="13.5" width="7" height="7" rx="2" stroke="currentColor" stroke-width="2"/>
-        <rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="2"/>
+        <rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="#38bdf8" stroke="#0284c7" stroke-width="2"/>
+        <rect x="13.5" y="3.5" width="7" height="7" rx="2" fill="#facc15" stroke="#b45309" stroke-width="2"/>
+        <rect x="3.5" y="13.5" width="7" height="7" rx="2" fill="#f87171" stroke="#b91c1c" stroke-width="2"/>
+        <rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="#34d399" stroke="#047857" stroke-width="2"/>
       </svg>`;
   }
 }
@@ -498,8 +650,36 @@ export function svgTrophyMedallion(rank: 1 | 2 | 3, size = 44): string {
   `;
 }
 
+export function svgGoldStarCoin(size = 20): string {
+  const uid = `coin_${++svgUid}`;
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 3px rgba(120,53,15,0.35));flex-shrink:0;vertical-align:middle;display:inline-block">
+      <defs>
+        <radialGradient id="${uid}_body" cx="35%" cy="30%" r="68%">
+          <stop offset="0%" stop-color="#fffbeb"/>
+          <stop offset="35%" stop-color="#fde047"/>
+          <stop offset="70%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#b45309"/>
+        </radialGradient>
+        <linearGradient id="${uid}_rim" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fef08a"/>
+          <stop offset="100%" stop-color="#92400e"/>
+        </linearGradient>
+      </defs>
+      <!-- Outer Rim -->
+      <circle cx="16" cy="16" r="14.5" fill="url(#${uid}_rim)" stroke="#78350f" stroke-width="1.8"/>
+      <!-- Inner Coin Core -->
+      <circle cx="16" cy="16" r="11.8" fill="url(#${uid}_body)" stroke="#b45309" stroke-width="1.2"/>
+      <!-- Embossed Center Star -->
+      <polygon points="16,7.5 18.2,12.5 23.5,13.1 19.5,16.8 20.6,22.2 16,19.4 11.4,22.2 12.5,16.8 8.5,13.1 13.8,12.5" fill="#fef08a" stroke="#78350f" stroke-width="1" stroke-linejoin="round"/>
+      <!-- Specular Highlight Arc -->
+      <ellipse cx="12" cy="9.5" rx="3.5" ry="1.6" transform="rotate(-30 12 9.5)" fill="#ffffff" opacity="0.75"/>
+    </svg>
+  `;
+}
+
 export function svgStarCoin(size = 18): string {
-  return imgBundleSprite('ui_star_wood', size, 'coin-sprite');
+  return svgGoldStarCoin(size);
 }
 
 export function svgTicket(size = 18): string {
