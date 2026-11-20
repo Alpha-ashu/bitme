@@ -104,14 +104,6 @@ function renderHomePage(ctx: AppContext): string {
         </div>
 
         <div class="hero-right-col">
-          <div class="hero-showcase" data-nav="inventory" title="Wearables">
-            ${svgSnakePreview(undefined, state.equippedAccessory, tier === 'tiny' || tier === 'landscape' ? 52 : 70, p.equippedEvolution)}
-            <div style="flex:1;min-width:0">
-              <strong class="uname-ellipsis">${esc(p.displayName || 'Explorer')}</strong>
-              <small>${esc(p.equippedEvolution || 'Baby')}</small>
-            </div>
-            <span class="btn btn-xs btn-gold">Wearables</span>
-          </div>
           <div class="hero-stats-mini three-col">
             <div class="mini-kpi"><span>Best</span><b>${fmtNum(p.stats?.highestScore)}</b></div>
             <div class="mini-kpi"><span>Wins</span><b>${fmtNum(p.stats?.matchesWon)}</b></div>

@@ -555,23 +555,7 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
 .hero-ctas { display: flex; flex-wrap: wrap; gap: 7px; }
 .hero-ctas-single { display: flex; }
 .hero-play-btn { width: 100%; max-width: 280px; justify-content: center; font-size: 14.5px; padding: 9px 14px; }
-.hero-right-col { display: flex; flex-direction: column; gap: 8px; }
-
-.hero-showcase {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 20px;
-  background: radial-gradient(circle at 26% 24%, #ffffff 0%, #d1fae5 100%);
-  border: 2.5px solid #6fd39e;
-  box-shadow: inset 0 2px 0 #ffffff, 0 4px 0 #5bc28c;
-  cursor: pointer;
-  transition: transform 0.12s ease;
-}
-.hero-showcase:active { transform: translateY(2px); }
-.hero-showcase strong { display: block; color: var(--emerald-deep); font-size: 15px; }
-.hero-showcase small { display: block; color: var(--emerald); font-size: 11.5px; font-weight: 800; }
+.hero-right-col { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
 
 .hero-stats-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .hero-stats-mini.three-col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1962,7 +1946,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   .xp-row small { font-size: 10px; }
   .hero-ctas { display: grid; grid-template-columns: 1.55fr 1fr 1fr; gap: 5px; }
   .hero-ctas .btn { font-size: 11.5px; padding: 6px 4px; border-radius: 11px; }
-  .hero-showcase { padding: 5px 8px; }
   .mini-kpi { padding: 4px 2px; }
 }
 
@@ -1976,7 +1959,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   .hero-card { grid-template-columns: minmax(0, 1.35fr) minmax(220px, 1fr); padding: 7px 11px; gap: 8px; }
   .hero-card h2 { font-size: 18px; }
   .xp-row { margin: 3px 0 5px; }
-  .hero-showcase { padding: 5px 8px; }
   .hero-ctas .btn { padding: 6px 10px; font-size: 12px; }
   .panel { padding: 7px 10px; }
   .page-hdr h2 { font-size: 18px; }
