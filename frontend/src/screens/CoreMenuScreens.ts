@@ -24,6 +24,7 @@ import {
   renderRewardsPage,
   renderSocialPage,
 } from './CollectionSocialScreens';
+import { bindAdventureJourneyEvents, renderAdventureJourneyMap } from '../components/AdventureJourneyMap';
 import { AppContext, EVO_LADDER, getViewportTier, ONB_AVATARS, Page, REGIONS, UI_MODE_ORDER, UI_MODES, UIMode } from './types';
 
 const menuUiState = {
@@ -33,6 +34,7 @@ const menuUiState = {
   campaignWorld: 1,
   campaignPage: 0,
   campaignHalf: 0,
+  journeyView: 'map' as 'map' | 'quests',
   lobbyTab: 'rooms' as 'rooms' | 'create' | 'join',
   lobbyPage: 0,
   profileTab: 'identity' as 'identity' | 'stats' | 'history',
@@ -364,6 +366,10 @@ function renderLobbyPage(ctx: AppContext): string {
 }
 
 function renderStoryPage(ctx: AppContext): string {
+  if (menuUiState.journeyView === 'map') {
+    return renderAdventureJourneyMap(ctx);
+  }
+
   const { state } = ctx;
   const tier = getViewportTier();
   const isCompact = tier === 'tiny' || tier === 'mobile' || tier === 'landscape';
@@ -559,6 +565,7 @@ function renderStoryPage(ctx: AppContext): string {
       <div class="page-hdr">
         <h2>Adventure</h2>
         <div class="form-actions">
+          <button class="btn btn-gold btn-xs" id="journey-open-map">🗺 Journey Map</button>
           <button class="btn btn-primary btn-xs" id="story-resume-adv" data-adv-play="${axes.highestUnlockedLevel}">▶ Lv.${axes.highestUnlockedLevel}</button>
           <button class="btn btn-gold btn-xs" id="story-enter-world">Explore</button>
           ${current.boss ? `<button class="btn btn-blue btn-xs" id="story-fight-boss">Boss</button>` : ''}
@@ -1050,6 +1057,16 @@ function bindMenuEvents(root: HTMLElement, ctx: AppContext, hubItems: Array<{ id
   });
 
   // Story & 1,000-Level Campaign Tabs & Events
+  bindAdventureJourneyEvents(root, ctx);
+  root.querySelector('#journey-toggle-quests')?.addEventListener('click', () => {
+    menuUiState.journeyView = 'quests';
+    ctx.render();
+  });
+  root.querySelector('#journey-open-map')?.addEventListener('click', () => {
+    menuUiState.journeyView = 'map';
+    ctx.render();
+  });
+
   root.querySelectorAll<HTMLElement>('[data-story-tab]').forEach(b => {
     b.addEventListener('click', () => { menuUiState.storyTab = b.dataset.storyTab as any; ctx.render(); });
   });

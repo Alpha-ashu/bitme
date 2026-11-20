@@ -666,3 +666,45 @@ export function svgHappySmileyAvatar(size = 42, emoji?: string): string {
     </svg>
   `;
 }
+
+/** Cute fuzzy monster mascot "Booo" matching the Adventure Journey Map reference */
+export function svgBoooMascot(size = 38): string {
+  const uid = `booo_${++svgUid}`;
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 44 44" fill="none" aria-hidden="true" style="filter:drop-shadow(0 2px 4px rgba(2,132,199,0.35))">
+      <defs>
+        <radialGradient id="${uid}_body" cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#bae6fd"/>
+          <stop offset="45%" stop-color="#38bdf8"/>
+          <stop offset="100%" stop-color="#0284c7"/>
+        </radialGradient>
+        <linearGradient id="${uid}_horn" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fef08a"/>
+          <stop offset="100%" stop-color="#f59e0b"/>
+        </linearGradient>
+      </defs>
+      <!-- Horns -->
+      <path d="M12 12 Q8 4 14 6 Q16 9 15 13 Z" fill="url(#${uid}_horn)" stroke="#78350f" stroke-width="1.2"/>
+      <path d="M32 12 Q36 4 30 6 Q28 9 29 13 Z" fill="url(#${uid}_horn)" stroke="#78350f" stroke-width="1.2"/>
+      <!-- Fuzzy Round Monster Body -->
+      <circle cx="22" cy="24" r="16" fill="url(#${uid}_body)" stroke="#0369a1" stroke-width="2"/>
+      <!-- Fur Tufts -->
+      <path d="M7 23 Q5 25 8 27 Q6 28 8 30" stroke="#0284c7" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M37 23 Q39 25 36 27 Q38 28 36 30" stroke="#0284c7" stroke-width="1.6" stroke-linecap="round"/>
+      <!-- Big Cute Eyes -->
+      <circle cx="16" cy="21" r="5" fill="#ffffff" stroke="#082f49" stroke-width="1.2"/>
+      <circle cx="17" cy="21" r="2.8" fill="#0f172a"/>
+      <circle cx="16" cy="19.5" r="1.1" fill="#ffffff"/>
+      <circle cx="28" cy="21" r="5" fill="#ffffff" stroke="#082f49" stroke-width="1.2"/>
+      <circle cx="27" cy="21" r="2.8" fill="#0f172a"/>
+      <circle cx="26" cy="19.5" r="1.1" fill="#ffffff"/>
+      <!-- Rosy Cheeks -->
+      <ellipse cx="11.5" cy="26" rx="2.5" ry="1.5" fill="#f43f5e" opacity="0.45"/>
+      <ellipse cx="32.5" cy="26" rx="2.5" ry="1.5" fill="#f43f5e" opacity="0.45"/>
+      <!-- Open Happy Mouth with Little Fang -->
+      <path d="M16 28 Q22 34 28 28 C28 32 16 32 16 28 Z" fill="#881337" stroke="#0369a1" stroke-width="1.2"/>
+      <polygon points="18,28 20,28 19,30" fill="#ffffff"/>
+      <polygon points="24,28 26,28 25,30" fill="#ffffff"/>
+    </svg>
+  `;
+}

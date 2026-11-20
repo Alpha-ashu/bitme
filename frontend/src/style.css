@@ -2497,6 +2497,402 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   color: #713f12;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ADVENTURE JOURNEY MAP (Winding Mountain Trail & 3D Stone Nodes)
+   ═══════════════════════════════════════════════════════════════ */
+
+.journey-map-wrap {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: #14532d;
+  border-radius: 24px;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Floating Top HUD */
+.journey-map-topbar {
+  position: absolute;
+  top: calc(8px + var(--safe-t));
+  left: calc(10px + var(--safe-l));
+  right: calc(10px + var(--safe-r));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+.journey-map-topbar > * {
+  pointer-events: auto;
+}
+
+/* 3D Chiseled Stone Back Button */
+.stone-back-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #cbd5e1 100%);
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 0 #64748b, 0 6px 14px rgba(0, 0, 0, 0.25);
+  display: grid;
+  place-items: center;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: #475569;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  line-height: 1;
+}
+.stone-back-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #64748b;
+}
+
+/* Center World Banner */
+.journey-world-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(241, 245, 249, 0.92) 100%);
+  border: 2px solid #cbd5e1;
+  box-shadow: 0 3.5px 0 #94a3b8, 0 6px 14px rgba(0, 0, 0, 0.18);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e293b;
+  max-width: 220px;
+}
+.journey-world-pill span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.journey-world-pill button {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.journey-world-pill button:hover {
+  color: #0f172a;
+}
+
+/* Rich Carved Wood Coin Capsule */
+.journey-coin-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 42px 0 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #78350f 0%, #542203 55%, #361401 100%);
+  border: 2.5px solid #b45309;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.4), 0 4px 0 #200b01, 0 6px 14px rgba(0, 0, 0, 0.3);
+  font-family: 'Fredoka', cursive, sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #fef08a;
+  text-shadow: 0 1.5px 0 #451a03;
+  letter-spacing: 0.5px;
+}
+.journey-coin-medallion {
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fef08a 0%, #f59e0b 55%, #b45309 100%);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2.5px 0 #78350f, 0 4px 8px rgba(0, 0, 0, 0.3);
+  display: grid;
+  place-items: center;
+}
+
+/* Scrollable Map Container */
+.journey-map-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Map Canvas */
+.journey-map-canvas {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 1320px;
+  background:
+    radial-gradient(ellipse 70% 30% at 75% 65%, rgba(6, 182, 212, 0.9) 0%, rgba(2, 132, 199, 0.8) 45%, transparent 65%),
+    radial-gradient(circle at 20% 40%, rgba(6, 182, 212, 0.75) 0%, transparent 45%),
+    radial-gradient(ellipse 80% 50% at 30% 85%, #22c55e 0%, transparent 60%),
+    radial-gradient(ellipse 90% 60% at 80% 35%, #16a34a 0%, transparent 65%),
+    radial-gradient(ellipse 70% 50% at 20% 15%, #4ade80 0%, transparent 60%),
+    linear-gradient(180deg, #15803d 0%, #166534 35%, #14532d 70%, #052e16 100%);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.25);
+}
+
+.journey-lake-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 190px 440px at 72% 64%, rgba(6, 182, 212, 0.88) 0%, rgba(2, 132, 199, 0.75) 45%, transparent 68%),
+    radial-gradient(ellipse 150px 320px at 28% 36%, rgba(6, 182, 212, 0.8) 0%, rgba(3, 105, 161, 0.65) 50%, transparent 70%);
+  opacity: 0.92;
+}
+
+/* Floating cloud layers */
+.journey-cloud {
+  position: absolute;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.75) 55%, transparent 75%);
+  filter: blur(1.5px);
+  pointer-events: none;
+  z-index: 8;
+  border-radius: 50%;
+}
+.journey-cloud.c1 { width: 230px; height: 95px; top: 140px; left: -40px; opacity: 0.85; }
+.journey-cloud.c2 { width: 270px; height: 115px; top: 560px; right: -50px; opacity: 0.82; }
+.journey-cloud.c3 { width: 250px; height: 105px; top: 920px; left: -30px; opacity: 0.88; }
+
+/* SVG Road overlay */
+.journey-road-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Level Milestone Nodes */
+.journey-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  outline: none;
+  transition: transform 0.12s ease;
+}
+.journey-node:hover {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+.journey-node:active {
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+/* Level 1: Big Warm Gold 3D Pedestal */
+.journey-node-gold {
+  width: 74px;
+  height: 70px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 50%, #d97706 100%);
+  border: 3.5px solid #fef08a;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 7px 0 #853d07, 0 14px 22px rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+}
+.journey-node-gold strong {
+  font-family: 'Fredoka', cursive, sans-serif;
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1;
+  color: #6b2608;
+  text-shadow: 0 2px 0 #fde68a, -1px -1px 0 #fde68a, 1px -1px 0 #fde68a;
+}
+
+/* Levels 2+: 3D Chiseled Stone Slabs */
+.journey-node-stone {
+  width: 68px;
+  height: 62px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #cbd5e1 100%);
+  border: 3px solid #ffffff;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 6px 0 #64748b, 0 12px 18px rgba(0, 0, 0, 0.28);
+  display: grid;
+  place-items: center;
+}
+.journey-node-stone strong {
+  font-family: 'Fredoka', cursive, sans-serif;
+  font-size: 33px;
+  font-weight: 900;
+  line-height: 1;
+  color: #64748b;
+  text-shadow: 0 1.5px 0 #ffffff;
+}
+
+/* Completed Level Stars */
+.journey-node-stars {
+  display: flex;
+  gap: 2px;
+  margin-top: 3px;
+}
+.journey-node-stars span {
+  font-size: 13px;
+  color: #facc15;
+  filter: drop-shadow(0 1.5px 0 #854d0e);
+}
+
+/* Locked Node */
+.journey-node.locked .journey-node-stone {
+  background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+  border-color: #e2e8f0;
+  box-shadow: 0 5px 0 #475569;
+  opacity: 0.88;
+}
+.journey-node.locked strong {
+  color: #94a3b8;
+}
+
+/* Boss Checkpoint Node */
+.journey-node.boss .journey-node-stone {
+  background: linear-gradient(180deg, #fee2e2 0%, #fca5a5 45%, #ef4444 100%);
+  border-color: #fef2f2;
+  box-shadow: 0 6px 0 #991b1b, 0 12px 20px rgba(185, 28, 28, 0.35);
+}
+.journey-node.boss strong {
+  color: #7f1d1d;
+}
+
+/* Intermediate Stepping Stones / Coins */
+.journey-step-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+/* Completed Terracotta Cracked 'X' Stone */
+.journey-step-dot.done {
+  background: linear-gradient(180deg, #d97706 0%, #b45309 60%, #92400e 100%);
+  border: 2px solid #fef08a;
+  box-shadow: 0 3px 0 #78350f, 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+.journey-step-dot.done::after {
+  content: '✕';
+  font-size: 13px;
+  font-weight: 900;
+  color: #451a03;
+  line-height: 1;
+}
+/* Upcoming Golden Coin Stepping Dot */
+.journey-step-dot.future {
+  background: linear-gradient(180deg, #fef08a 0%, #f59e0b 60%, #d97706 100%);
+  border: 2px solid #ffffff;
+  box-shadow: 0 3px 0 #92400e, 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Player Avatar Token & Floating Speech Bubble */
+.journey-avatar-token {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  animation: mapTokenFloat 2.4s ease-in-out infinite;
+}
+@keyframes mapTokenFloat {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-6px); }
+}
+
+.journey-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  box-shadow: 0 3px 0 #cbd5e1, 0 4px 8px rgba(0, 0, 0, 0.18);
+  margin-bottom: 5px;
+  white-space: nowrap;
+}
+.journey-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #ffffff;
+}
+
+.journey-avatar-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3.5px solid #ffffff;
+  background: radial-gradient(circle at 35% 30%, #e0f2fe 0%, #38bdf8 55%, #0284c7 100%);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6), 0 0 0 3px #0ea5e9;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+/* Stage Inspection Modal Backdrop & Card */
+.journey-stage-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(5px);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.journey-stage-card {
+  width: 100%;
+  max-width: 360px;
+  background: linear-gradient(180deg, #fffcf0 0%, #fff7e0 100%);
+  border: 4px solid #78350f;
+  border-radius: 28px;
+  padding: 22px 18px 18px;
+  box-shadow: inset 0 2px 0 #ffffff, 0 8px 0 #451a03, 0 20px 40px rgba(0, 0, 0, 0.4);
+  position: relative;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* 1,000-Level Adventure Campaign Hub */
 .campaign-panel {
   flex: 1;
