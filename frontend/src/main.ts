@@ -191,6 +191,8 @@ class AnacondaParkApp {
     this.applySettingsToDom();
     audio.setSfxEnabled(settings.sfx);
     audio.setMusicEnabled(settings.music);
+    (window as any).__coilQuestApp = this;
+    (window as any).__coilQuestCtx = this.ctx;
 
     let lastTier = getViewportTier();
     window.addEventListener('resize', () => {

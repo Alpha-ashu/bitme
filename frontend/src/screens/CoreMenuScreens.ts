@@ -847,7 +847,7 @@ export function renderAppShell(root: HTMLElement, ctx: AppContext): void {
   }
 
   root.innerHTML = `
-    <div class="app-shell">
+    <div class="app-shell page-${state.page}">
       <header class="app-topbar">
         <div class="brand-lockup" data-nav="home">
           <span class="brand-glyph">${svgSerpentCrest(34)}</span>
@@ -1076,6 +1076,10 @@ function bindMenuEvents(root: HTMLElement, ctx: AppContext, hubItems: Array<{ id
   // Story & 1,000-Level Campaign Tabs & Events
   bindAdventureJourneyEvents(root, ctx);
   root.querySelector('#journey-toggle-quests')?.addEventListener('click', () => {
+    menuUiState.journeyView = 'quests';
+    ctx.render();
+  });
+  root.querySelector('#journey-world-label')?.addEventListener('click', () => {
     menuUiState.journeyView = 'quests';
     ctx.render();
   });

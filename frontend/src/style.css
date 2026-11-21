@@ -1840,6 +1840,28 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 }
 
 @media (max-width: 767px), (max-height: 520px) {
+  /* Full-bleed immersive Story Journey Map on mobile */
+  .app-shell.page-story .app-topbar {
+    display: none !important;
+  }
+  .app-shell.page-story .app-workspace {
+    padding: 0 !important;
+    gap: 0 !important;
+    height: 100dvh;
+    max-width: 100%;
+  }
+  .app-shell.page-story .app-main {
+    height: 100dvh;
+    padding: 0 !important;
+    max-width: 100%;
+  }
+  .app-shell.page-story .journey-map-wrap {
+    border-radius: 0;
+    box-shadow: none;
+    height: 100dvh;
+    padding-bottom: calc(64px + var(--safe-b));
+  }
+
   .app-workspace {
     grid-template-columns: minmax(0, 1fr);
     padding: 8px calc(10px + var(--safe-r)) calc(74px + var(--safe-b)) calc(10px + var(--safe-l));
@@ -2601,7 +2623,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: #14532d;
+  background: #064e3b;
   border-radius: 24px;
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
 }
@@ -2609,14 +2631,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 /* Floating Top HUD */
 .journey-map-topbar {
   position: absolute;
-  top: calc(8px + var(--safe-t));
-  left: calc(8px + var(--safe-l));
-  right: calc(8px + var(--safe-r));
+  top: calc(10px + var(--safe-t));
+  left: calc(12px + var(--safe-l));
+  right: calc(12px + var(--safe-r));
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
   pointer-events: none;
 }
 .journey-map-topbar > * {
@@ -2630,7 +2652,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   border-radius: 50%;
   background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #cbd5e1 100%);
   border: 3px solid #ffffff;
-  box-shadow: 0 4px 0 #64748b, 0 6px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 0 #64748b, 0 6px 14px rgba(0, 0, 0, 0.3);
   display: grid;
   place-items: center;
   font-family: 'Fredoka', sans-serif;
@@ -2650,19 +2672,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 .journey-world-pill {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 8px;
+  gap: 4px;
+  padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(15, 23, 42, 0.84);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   font-family: 'Fredoka', sans-serif;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
   color: #ffffff;
-  max-width: 205px;
+  max-width: 210px;
   min-width: 0;
   flex-shrink: 1;
 }
@@ -2691,17 +2713,17 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 38px;
-  padding: 0 38px 0 14px;
+  height: 40px;
+  padding: 0 40px 0 16px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #78350f 0%, #542203 55%, #361401 100%);
+  background: linear-gradient(180deg, #6b2608 0%, #451a03 55%, #270d01 100%);
   border: 2px solid #f59e0b;
-  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.4), 0 4px 0 #200b01, 0 6px 14px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 4px 0 #1b0801, 0 8px 16px rgba(0, 0, 0, 0.35);
   font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
   color: #fef08a;
-  text-shadow: 0 1.5px 0 #451a03;
+  text-shadow: 0 1.5px 0 #3b1101;
   letter-spacing: 0.5px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -2714,15 +2736,15 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 }
 .journey-coin-medallion {
   position: absolute;
-  right: -2px;
+  right: -3px;
   top: 50%;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fef08a 0%, #f59e0b 55%, #b45309 100%);
-  border: 2px solid #ffffff;
-  box-shadow: 0 2.5px 0 #78350f, 0 4px 8px rgba(0, 0, 0, 0.3);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 2.5px 0 #78350f, 0 4px 8px rgba(0, 0, 0, 0.35);
   display: grid;
   place-items: center;
 }
@@ -2739,39 +2761,31 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   -webkit-overflow-scrolling: touch;
 }
 
-/* Map Canvas */
+/* Map Canvas (Photorealistic Aerial Alpine Mountain Valley Background) */
 .journey-map-canvas {
   position: relative;
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
   min-height: 740px;
-  background: #064e3b;
-  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.25);
-}
-
-.journey-landscape-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
   height: 100%;
-  pointer-events: none;
-  z-index: 1;
+  background: url('/assets/adventure_map_bg.jpg') center top / 100% 100% no-repeat, #064e3b;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.25);
 }
 
 /* Floating cloud layers matching alpine reference */
 .journey-cloud {
   position: absolute;
-  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.16) 50%, transparent 75%);
-  filter: blur(8px);
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.28) 45%, transparent 75%);
+  filter: blur(7px);
   pointer-events: none;
   z-index: 8;
   border-radius: 50%;
 }
 .journey-cloud.c1 { width: 220px; height: 90px; top: 15px; left: -30px; opacity: 0.85; }
-.journey-cloud.c2 { width: 240px; height: 100px; top: 200px; right: -40px; opacity: 0.82; }
-.journey-cloud.c3 { width: 210px; height: 85px; top: 440px; left: -30px; opacity: 0.78; }
-.journey-cloud.c4 { width: 220px; height: 95px; top: 600px; right: -30px; opacity: 0.85; }
+.journey-cloud.c2 { width: 240px; height: 100px; top: 180px; right: -40px; opacity: 0.82; }
+.journey-cloud.c3 { width: 210px; height: 85px; top: 380px; left: -30px; opacity: 0.75; }
+.journey-cloud.c4 { width: 220px; height: 95px; top: 540px; right: -30px; opacity: 0.82; }
 
 /* SVG Road overlay */
 .journey-road-svg {
@@ -2805,41 +2819,41 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   transform: translate(-50%, -50%) scale(0.96);
 }
 
-/* Level 1: Big Warm Gold 3D Pedestal */
+/* Level 1: Honey Gold 3D Master Pedestal */
 .journey-node-gold {
-  width: 76px;
-  height: 72px;
-  border-radius: 24px;
+  width: 80px;
+  height: 74px;
+  border-radius: 26px;
   background: linear-gradient(180deg, #fde047 0%, #f59e0b 50%, #d97706 100%);
-  border: 3.5px solid #fef08a;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 8px 0 #78350f, 0 16px 24px rgba(0, 0, 0, 0.35);
+  border: 4px solid #fef08a;
+  box-shadow: inset 0 2.5px 0 rgba(255, 255, 255, 0.75), 0 9px 0 #78350f, 0 16px 26px rgba(0, 0, 0, 0.4);
   display: grid;
   place-items: center;
 }
 .journey-node-gold strong {
   font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 42px;
+  font-size: 46px;
   font-weight: 900;
   line-height: 1;
-  color: #6b2608;
+  color: #5c2406;
   text-shadow: 0 2px 0 #fde68a, -1px -1px 0 #fde68a, 1px -1px 0 #fde68a;
 }
 
-/* Levels 2+: 3D Chiseled Stone Slabs matching Reference */
+/* Levels 2+: 3D Chiseled White Stone Tablets matching Reference */
 .journey-node-stone {
-  width: 68px;
-  height: 62px;
-  border-radius: 20px;
+  width: 72px;
+  height: 66px;
+  border-radius: 22px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 45%, #e2e8f0 100%);
-  border: 3px solid #ffffff;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 6px 0 #64748b, 0 12px 20px rgba(0, 0, 0, 0.3);
+  border: 3.5px solid #ffffff;
+  box-shadow: inset 0 2.5px 0 rgba(255, 255, 255, 0.95), 0 7px 0 #64748b, 0 14px 22px rgba(0, 0, 0, 0.35);
   display: grid;
   place-items: center;
   opacity: 1;
 }
 .journey-node-stone strong {
   font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 34px;
+  font-size: 36px;
   font-weight: 900;
   line-height: 1;
   color: #64748b;
@@ -2849,20 +2863,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 /* Completed Level Stars */
 .journey-node-stars {
   display: flex;
-  gap: 2px;
-  margin-top: 3px;
+  gap: 3px;
+  margin-top: 4px;
 }
 .journey-node-stars span {
-  font-size: 13px;
+  font-size: 15px;
   color: #facc15;
-  filter: drop-shadow(0 1.5px 0 #854d0e);
+  filter: drop-shadow(0 2px 0 #78350f);
 }
 
 /* Locked Node (Solid Opaque 3D Stone matching Reference) */
 .journey-node.locked .journey-node-stone {
   background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #cbd5e1 100%);
   border-color: #ffffff;
-  box-shadow: inset 0 1.5px 0 #ffffff, 0 5px 0 #64748b, 0 10px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 2px 0 #ffffff, 0 6px 0 #64748b, 0 12px 18px rgba(0, 0, 0, 0.3);
   opacity: 1;
 }
 .journey-node.locked strong {
@@ -2873,7 +2887,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 .journey-node.boss .journey-node-stone {
   background: linear-gradient(180deg, #fee2e2 0%, #fca5a5 45%, #ef4444 100%);
   border-color: #fef2f2;
-  box-shadow: 0 6px 0 #991b1b, 0 12px 20px rgba(185, 28, 28, 0.35);
+  box-shadow: 0 7px 0 #991b1b, 0 14px 22px rgba(185, 28, 28, 0.35);
 }
 .journey-node.boss strong {
   color: #7f1d1d;
@@ -2884,8 +2898,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 6;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -2893,12 +2907,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 }
 /* Completed Terracotta Cracked 'X' Stone */
 .journey-step-dot.done {
-  background: linear-gradient(180deg, #d97706 0%, #b45309 60%, #92400e 100%);
+  background: linear-gradient(180deg, #d97706 0%, #b45309 60%, #78350f 100%);
   border: 2px solid #fef08a;
-  box-shadow: 0 3px 0 #78350f, 0 4px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 0 #451a03, 0 5px 8px rgba(0, 0, 0, 0.35);
 }
-.journey-step-dot.done::after {
-  content: '✕';
+.journey-step-dot.done span {
+  font-family: 'Fredoka', sans-serif;
   font-size: 13px;
   font-weight: 900;
   color: #451a03;
@@ -2906,9 +2920,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 }
 /* Upcoming Golden Coin Stepping Dot */
 .journey-step-dot.future {
-  background: linear-gradient(180deg, #fef08a 0%, #f59e0b 60%, #d97706 100%);
+  background: radial-gradient(circle at 35% 30%, #fef08a 0%, #f59e0b 60%, #b45309 100%);
   border: 2px solid #ffffff;
-  box-shadow: 0 3px 0 #92400e, 0 4px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 0 #78350f, 0 4px 6px rgba(0, 0, 0, 0.25);
 }
 
 /* Player Avatar Token & Floating Speech Bubble */
@@ -2932,9 +2946,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   background: #ffffff;
   border: 2px solid #e2e8f0;
   border-radius: 999px;
-  padding: 2px 10px;
+  padding: 3px 12px;
   font-family: 'Fredoka', sans-serif;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   color: #475569;
   box-shadow: 0 3px 0 #cbd5e1, 0 4px 8px rgba(0, 0, 0, 0.18);
@@ -2944,19 +2958,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 .journey-bubble::after {
   content: '';
   position: absolute;
-  bottom: -5px;
+  bottom: -6px;
   left: 50%;
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid #ffffff;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #ffffff;
 }
 
 .journey-avatar-badge {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   border: 3.5px solid #ffffff;
   background: radial-gradient(circle at 35% 30%, #e0f2fe 0%, #38bdf8 55%, #0284c7 100%);
@@ -2964,6 +2978,44 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   display: grid;
   place-items: center;
   overflow: hidden;
+}
+
+/* Sleek Floating Action Button for Quests / Realms (Unobtrusive & Accessible) */
+.journey-fab-quests {
+  position: absolute;
+  right: 14px;
+  bottom: calc(76px + var(--safe-b));
+  z-index: 35;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fde047 0%, #f59e0b 60%, #d97706 100%);
+  border: 2.5px solid #fef08a;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75), 0 4px 0 #78350f, 0 8px 18px rgba(0, 0, 0, 0.35);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #451a03;
+  text-shadow: 0 1px 0 #fde68a;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.journey-fab-quests:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75), 0 6px 0 #78350f, 0 12px 22px rgba(0, 0, 0, 0.4);
+}
+.journey-fab-quests:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 2px 0 #78350f, 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+.journey-fab-quests .fab-ico {
+  font-size: 16px;
+  line-height: 1;
+}
+.journey-fab-quests .fab-label {
+  letter-spacing: 0.3px;
 }
 
 /* Stage Inspection Modal Backdrop & Card */
