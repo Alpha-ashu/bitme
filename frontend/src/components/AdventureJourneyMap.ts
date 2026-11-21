@@ -119,34 +119,28 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
           <div class="journey-cloud c3"></div>
           <div class="journey-cloud c4"></div>
 
-          <!-- SVG 3D Cobblestone Trail Ribbon -->
+          <!-- SVG 3D Fantasy Stepping Trail Ribbon -->
           <svg class="journey-road-svg" viewBox="0 0 400 680" preserveAspectRatio="none" aria-hidden="true">
             <defs>
-              <linearGradient id="trailTerracotta" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#fb923c"/>
-                <stop offset="50%" stop-color="#ea580c"/>
-                <stop offset="100%" stop-color="#9a3412"/>
-              </linearGradient>
-              <linearGradient id="trailCobble" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#ffffff"/>
-                <stop offset="50%" stop-color="#f8fafc"/>
-                <stop offset="100%" stop-color="#cbd5e1"/>
+              <linearGradient id="trailGoldPath" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#fbbf24"/>
+                <stop offset="50%" stop-color="#f59e0b"/>
+                <stop offset="100%" stop-color="#d97706"/>
               </linearGradient>
             </defs>
 
-            <!-- Soft Landscape Ground Shadow -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(15, 35, 20, 0.35)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" transform="translate(3, 7)"/>
+            <!-- Soft Landscape Meadow Shadow -->
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(16, 50, 24, 0.18)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" transform="translate(2, 5)"/>
 
-            <!-- Cobblestone Curb & Surface (Upcoming / Locked Section) -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#94a3b8" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="url(#trailCobble)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#64748b" stroke-width="2.5" stroke-dasharray="8 7" stroke-linecap="round"/>
+            <!-- Warm Sand & Cobblestone Path Underlay -->
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(254, 243, 199, 0.65)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#fde68a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 14"/>
 
-            <!-- Completed Golden Trail Section -->
+            <!-- Completed Golden Progression Trail (From Stage 1 to Active Stage) -->
             ${completedSegments.map(seg => `
-              <path d="${seg}" fill="none" stroke="#7c2d12" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="${seg}" fill="none" stroke="url(#trailTerracotta)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="${seg}" fill="none" stroke="#fef08a" stroke-width="2.5" stroke-dasharray="8 7" stroke-linecap="round"/>
+              <path d="${seg}" fill="none" stroke="rgba(180, 83, 9, 0.3)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="${seg}" fill="none" stroke="url(#trailGoldPath)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="${seg}" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 8"/>
             `).join('')}
           </svg>
 
