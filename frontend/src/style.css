@@ -503,9 +503,9 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   align-items: center;
   padding: 16px 18px;
   border-radius: 26px;
-  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
-  border: 2.5px solid #86efac;
-  box-shadow: inset 0 2px 0 #ffffff, 0 6px 0 #4ade80, 0 18px 36px rgba(6, 78, 59, 0.22);
+  background: linear-gradient(180deg, rgba(22, 38, 70, 0.95) 0%, rgba(13, 24, 48, 0.98) 100%);
+  border: 2px solid rgba(56, 189, 248, 0.35);
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.2), 0 6px 0 #071022, 0 18px 36px rgba(0, 0, 0, 0.55);
 }
 .hero-top-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
 .hero-eyebrow {
@@ -520,27 +520,27 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
 .hero-castle-tag {
   padding: 3px 10px;
   border-radius: 99px;
-  background: #ffffff;
-  border: 2px solid #86efac;
-  color: #065f46;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1.5px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
   font-size: 11.5px;
   font-weight: 800;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 .hero-handle-pill {
   padding: 3px 10px;
   border-radius: 99px;
-  background: #ecfdf5;
-  border: 1.5px solid #9de0bd;
-  color: #05603a;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  color: #a7f3d0;
   font-size: 11.5px;
   font-weight: 800;
   max-width: 155px;
 }
-.hero-card h2 { font-size: clamp(20px, 3.4vw, 27px); line-height: 1.08; color: #064e3b; }
-.hero-subline { font-size: 12.5px; font-weight: 800; color: #64748b; margin-top: 2px; }
+.hero-card h2 { font-size: clamp(20px, 3.4vw, 27px); line-height: 1.08; color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4); }
+.hero-subline { font-size: 12.5px; font-weight: 800; color: #94a3b8; margin-top: 2px; }
 .xp-row { display: flex; align-items: center; gap: 8px; margin: 7px 0 9px; }
-.xp-row small { font-size: 11.5px; font-weight: 800; color: #065f46; white-space: nowrap; }
+.xp-row small { font-size: 11.5px; font-weight: 800; color: #34d399; white-space: nowrap; }
 
 /* Streak / Mission Checkboxes Bar */
 .streak-checks-row {
@@ -555,13 +555,13 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   font: inherit;
   text-align: left;
 }
-.streak-count { font-size: 11px; font-weight: 800; color: #64748b; margin-left: 3px; white-space: nowrap; }
+.streak-count { font-size: 11px; font-weight: 800; color: #94a3b8; margin-left: 3px; white-space: nowrap; }
 .streak-box {
   width: 24px;
   height: 24px;
   border-radius: 7px;
-  border: 1.5px solid #cbd5e1;
-  background: #f8fafc;
+  border: 1.5px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.6);
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -569,7 +569,7 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   color: #94a3b8;
 }
 .streak-box.done { background: #10b981; border-color: #047857; color: #ffffff; }
-.streak-box.today { background: #3b82f6; border-color: #1d4ed8; color: #ffffff; }
+.streak-box.today { background: #38bdf8; border-color: #0284c7; color: #ffffff; }
 
 .hero-ctas { display: flex; flex-wrap: wrap; gap: 7px; }
 .hero-ctas-single { display: flex; }
@@ -598,32 +598,38 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
 .hero-stats-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .hero-stats-mini.three-col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .mini-kpi {
-  background: #ffffff;
-  border: 2px solid #cbd5e1;
-  box-shadow: 0 3px 0 #94a3b8, 0 6px 12px rgba(0, 0, 0, 0.08);
+  background: rgba(15, 23, 42, 0.7);
+  border: 1.5px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 3px 0 #071022, 0 6px 12px rgba(0, 0, 0, 0.25);
   border-radius: 16px;
   padding: 7px 4px;
   text-align: center;
 }
 .hero-stats-mini.three-col .mini-kpi:nth-child(1) {
-  background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.18) 0%, rgba(180, 83, 9, 0.28) 100%);
   border-color: #f59e0b;
-  box-shadow: 0 3.5px 0 #d97706, 0 6px 14px rgba(245, 158, 11, 0.22);
+  box-shadow: 0 3.5px 0 #92400e, 0 6px 14px rgba(245, 158, 11, 0.25);
 }
-.hero-stats-mini.three-col .mini-kpi:nth-child(1) b { color: #92400e; font-size: 17px; }
+.hero-stats-mini.three-col .mini-kpi:nth-child(1) b { color: #fef08a; font-size: 17px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+.hero-stats-mini.three-col .mini-kpi:nth-child(1) span { color: #fcd34d; }
+
 .hero-stats-mini.three-col .mini-kpi:nth-child(2) {
-  background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.18) 0%, rgba(5, 96, 58, 0.28) 100%);
   border-color: #10b981;
-  box-shadow: 0 3.5px 0 #059669, 0 6px 14px rgba(16, 185, 129, 0.22);
+  box-shadow: 0 3.5px 0 #047857, 0 6px 14px rgba(16, 185, 129, 0.25);
 }
-.hero-stats-mini.three-col .mini-kpi:nth-child(2) b { color: #065f46; font-size: 17px; }
+.hero-stats-mini.three-col .mini-kpi:nth-child(2) b { color: #a7f3d0; font-size: 17px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+.hero-stats-mini.three-col .mini-kpi:nth-child(2) span { color: #6ee7b7; }
+
 .hero-stats-mini.three-col .mini-kpi:nth-child(3) {
-  background: linear-gradient(180deg, #ffffff 0%, #fff1f2 100%);
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.18) 0%, rgba(190, 18, 60, 0.28) 100%);
   border-color: #f43f5e;
-  box-shadow: 0 3.5px 0 #e11d48, 0 6px 14px rgba(244, 63, 94, 0.22);
+  box-shadow: 0 3.5px 0 #9f1239, 0 6px 14px rgba(244, 63, 94, 0.25);
 }
-.hero-stats-mini.three-col .mini-kpi:nth-child(3) b { color: #9f1239; font-size: 17px; }
-.mini-kpi span { display: block; font-size: 9.5px; font-weight: 900; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
+.hero-stats-mini.three-col .mini-kpi:nth-child(3) b { color: #fecdd3; font-size: 17px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+.hero-stats-mini.three-col .mini-kpi:nth-child(3) span { color: #fda4af; }
+
+.mini-kpi span { display: block; font-size: 9.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
 .mini-kpi b { font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 900; line-height: 1.1; margin-top: 2px; display: block; }
 
 /* Modern Quick Launch Grid */
@@ -636,25 +642,25 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 18px;
-  border: 2px solid #e2e8f0;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow: inset 0 1.5px 0 #ffffff, 0 3.5px 0 #cbd5e1, 0 8px 18px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid rgba(56, 189, 248, 0.25);
+  background: linear-gradient(180deg, rgba(24, 38, 70, 0.94) 0%, rgba(14, 24, 48, 0.98) 100%);
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.12), 0 3.5px 0 #071022, 0 8px 18px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   font: inherit;
   text-align: left;
   min-width: 0;
   transition: transform 0.1s ease, box-shadow 0.12s ease;
 }
-.quick-mode-pill:hover { transform: translateY(-1px); box-shadow: inset 0 1.5px 0 #ffffff, 0 5px 0 #94a3b8, 0 10px 22px rgba(0, 0, 0, 0.16); }
-.quick-mode-pill:active { transform: translateY(1px); box-shadow: 0 1.5px 0 #cbd5e1; }
+.quick-mode-pill:hover { transform: translateY(-1px); box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.2), 0 5px 0 #071022, 0 10px 22px rgba(0, 0, 0, 0.45); }
+.quick-mode-pill:active { transform: translateY(1px); box-shadow: 0 1.5px 0 #071022; }
 .quick-mode-pill.selected {
-  background: #ffffff;
-  border-color: #10b981;
-  box-shadow: inset 0 1.5px 0 #ffffff, 0 3.5px 0 #059669, 0 8px 20px rgba(16, 185, 129, 0.35);
+  background: linear-gradient(180deg, rgba(30, 50, 90, 0.96) 0%, rgba(18, 30, 60, 0.98) 100%);
+  border-color: #38bdf8;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.25), 0 3.5px 0 #0284c7, 0 8px 20px rgba(56, 189, 248, 0.4);
 }
 .qm-info { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
-.qm-info strong { font-size: 12.5px; color: #0f172a; display: block; }
-.qm-info small { font-size: 10px; font-weight: 800; color: #64748b; display: block; }
+.qm-info strong { font-size: 12.5px; color: #ffffff; display: block; }
+.qm-info small { font-size: 10px; font-weight: 800; color: #94a3b8; display: block; }
 .qm-go {
   width: 24px;
   height: 24px;
@@ -2831,110 +2837,173 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   transform: translate(-50%, -50%) scale(0.96);
 }
 
-/* Level 1: Honey Gold 3D Master Pedestal */
-.journey-node-gold {
-  width: 80px;
-  height: 74px;
-  border-radius: 26px;
-  background: linear-gradient(180deg, #fde047 0%, #f59e0b 50%, #d97706 100%);
-  border: 4px solid #fef08a;
-  box-shadow: inset 0 2.5px 0 rgba(255, 255, 255, 0.75), 0 9px 0 #78350f, 0 16px 26px rgba(0, 0, 0, 0.4);
-  display: grid;
-  place-items: center;
-}
-.journey-node-gold strong {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 46px;
-  font-weight: 900;
-  line-height: 1;
-  color: #5c2406;
-  text-shadow: 0 2px 0 #fde68a, -1px -1px 0 #fde68a, 1px -1px 0 #fde68a;
-}
-
-/* Levels 2+: 3D Chiseled White Stone Tablets matching Reference */
-.journey-node-stone {
-  width: 72px;
-  height: 66px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 45%, #e2e8f0 100%);
-  border: 3.5px solid #ffffff;
-  box-shadow: inset 0 2.5px 0 rgba(255, 255, 255, 0.95), 0 7px 0 #64748b, 0 14px 22px rgba(0, 0, 0, 0.35);
-  display: grid;
-  place-items: center;
-  opacity: 1;
-}
-.journey-node-stone strong {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 36px;
-  font-weight: 900;
-  line-height: 1;
-  color: #64748b;
-  text-shadow: 0 1.5px 0 #ffffff;
-}
-
-/* Completed Level Stars */
-.journey-node-stars {
+/* Circular 3D Game Medallions (Candy Crush / Archero / Brawl Stars style) */
+.journey-node.node-medallion {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 10;
   display: flex;
-  gap: 3px;
-  margin-top: 4px;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  outline: none;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.journey-node-stars span {
-  font-size: 15px;
-  color: #facc15;
+.journey-node.node-medallion:hover {
+  transform: translate(-50%, -50%) scale(1.12);
+}
+.journey-node.node-medallion:active {
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+.medallion-body {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+/* Completed: Rich Golden Sun Medallion */
+.medallion-body.completed {
+  background: linear-gradient(180deg, #fef08a 0%, #f59e0b 55%, #d97706 100%);
+  border: 3.5px solid #fef9c3;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 5px 0 #92400e, 0 10px 18px rgba(0, 0, 0, 0.35);
+}
+.medallion-body.completed .medallion-num {
+  font-family: 'Fredoka', cursive, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: #78350f;
+  text-shadow: 0 1.5px 0 #fde68a;
+  line-height: 1;
+}
+.medallion-stars {
+  position: absolute;
+  bottom: -10px;
+  display: flex;
+  gap: 2px;
   filter: drop-shadow(0 2px 0 #78350f);
 }
+.medallion-stars span {
+  font-size: 13px;
+  color: #facc15;
+  line-height: 1;
+}
 
-/* Locked Node (Solid Opaque 3D Stone matching Reference) */
-.journey-node.locked .journey-node-stone {
+/* Active Level: Radiant Cyan/Mint Pulse Medallion with Character Beacon */
+.medallion-body.active {
+  background: linear-gradient(180deg, #67e8f9 0%, #06b6d4 50%, #0891b2 100%);
+  border: 3.5px solid #ecfeff;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 5.5px 0 #155e75, 0 12px 24px rgba(6, 182, 212, 0.45);
+}
+.medallion-body.active .medallion-num {
+  font-family: 'Fredoka', cursive, sans-serif;
+  font-size: 30px;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 0 #0e7490, 0 0 8px rgba(255, 255, 255, 0.6);
+  line-height: 1;
+}
+.active-pulse-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2.5px solid #38bdf8;
+  animation: pulseBeacon 1.8s infinite ease-out;
+  pointer-events: none;
+}
+@keyframes pulseBeacon {
+  0% { transform: scale(0.92); opacity: 0.9; }
+  60% { transform: scale(1.22); opacity: 0.2; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+/* Locked Level: Sleek Frosted Stone Medallion */
+.medallion-body.locked {
   background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #cbd5e1 100%);
-  border-color: #ffffff;
-  box-shadow: inset 0 2px 0 #ffffff, 0 6px 0 #64748b, 0 12px 18px rgba(0, 0, 0, 0.3);
-  opacity: 1;
+  border: 3px solid #ffffff;
+  box-shadow: inset 0 2px 0 #ffffff, 0 5px 0 #64748b, 0 8px 16px rgba(0, 0, 0, 0.25);
 }
-.journey-node.locked strong {
-  color: #94a3b8;
+.medallion-body.locked .medallion-num {
+  font-family: 'Fredoka', cursive, sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: #64748b;
+  text-shadow: 0 1px 0 #ffffff;
+  line-height: 1;
+}
+.medallion-lock {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 13px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
-/* Boss Checkpoint Node */
-.journey-node.boss .journey-node-stone {
-  background: linear-gradient(180deg, #fee2e2 0%, #fca5a5 45%, #ef4444 100%);
-  border-color: #fef2f2;
-  box-shadow: 0 7px 0 #991b1b, 0 14px 22px rgba(185, 28, 28, 0.35);
+/* Boss Level: Imperial Citadel Keep Medallion */
+.medallion-body.boss {
+  width: 66px;
+  height: 66px;
+  background: linear-gradient(180deg, #fecdd3 0%, #f43f5e 50%, #be123c 100%);
+  border: 4px solid #fff1f2;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 6px 0 #881337, 0 14px 28px rgba(225, 29, 72, 0.4);
 }
-.journey-node.boss strong {
-  color: #7f1d1d;
+.medallion-body.boss .medallion-num {
+  font-family: 'Fredoka', cursive, sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 0 #9f1239;
+  line-height: 1;
+}
+.boss-crown-badge {
+  position: absolute;
+  top: -16px;
+  font-size: 22px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+  animation: crownBob 2s infinite ease-in-out;
+}
+@keyframes crownBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
-/* Intermediate Stepping Stones / Coins */
-.journey-step-dot {
+/* Stepping Pearls along the trail */
+.journey-step-pearl {
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 6;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   pointer-events: none;
 }
-/* Completed Terracotta Cracked 'X' Stone */
-.journey-step-dot.done {
-  background: linear-gradient(180deg, #d97706 0%, #b45309 60%, #78350f 100%);
-  border: 2px solid #fef08a;
-  box-shadow: 0 3px 0 #451a03, 0 5px 8px rgba(0, 0, 0, 0.35);
+.journey-step-pearl.done {
+  background: linear-gradient(180deg, #fef08a 0%, #f59e0b 60%, #b45309 100%);
+  border: 2px solid #fffbeb;
+  box-shadow: 0 2.5px 0 #78350f, 0 4px 8px rgba(0, 0, 0, 0.25);
 }
-.journey-step-dot.done span {
+.journey-step-pearl.done .pearl-core {
   font-family: 'Fredoka', sans-serif;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 900;
-  color: #451a03;
+  color: #78350f;
   line-height: 1;
 }
-/* Upcoming Golden Coin Stepping Dot */
-.journey-step-dot.future {
-  background: radial-gradient(circle at 35% 30%, #fef08a 0%, #f59e0b 60%, #b45309 100%);
+.journey-step-pearl.future {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 60%, #cbd5e1 100%);
   border: 2px solid #ffffff;
-  box-shadow: 0 3px 0 #78350f, 0 4px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2.5px 0 #64748b, 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Player Avatar Token & Floating Speech Bubble */

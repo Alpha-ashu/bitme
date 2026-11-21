@@ -23,25 +23,25 @@ interface MapSlot {
 }
 
 const MAP_SLOTS: MapSlot[] = [
-  { x: 145, y: 535, dots: [{ x: 185, y: 495 }, { x: 230, y: 455 }, { x: 268, y: 420 }] },
-  { x: 280, y: 388, dots: [{ x: 240, y: 355 }, { x: 185, y: 342 }, { x: 135, y: 330 }] },
-  { x: 95, y: 310, dots: [{ x: 142, y: 275 }, { x: 208, y: 250 }] },
-  { x: 265, y: 228, dots: [{ x: 235, y: 188 }, { x: 200, y: 165 }] },
-  { x: 172, y: 142, dots: [{ x: 138, y: 112 }] },
-  { x: 105, y: 82, dots: [{ x: 90, y: 45 }] },
+  { x: 155, y: 550, dots: [{ x: 190, y: 510 }, { x: 232, y: 468 }, { x: 262, y: 432 }] },
+  { x: 275, y: 405, dots: [{ x: 235, y: 372 }, { x: 185, y: 355 }, { x: 140, y: 338 }] },
+  { x: 110, y: 318, dots: [{ x: 152, y: 285 }, { x: 215, y: 260 }] },
+  { x: 270, y: 228, dots: [{ x: 238, y: 192 }, { x: 205, y: 170 }] },
+  { x: 175, y: 145, dots: [{ x: 145, y: 115 }] },
+  { x: 115, y: 80, dots: [{ x: 100, y: 40 }] },
 ];
 
 const BEZIER_PATH_FULL =
-  'M 145 535 C 175 490, 245 445, 280 388 C 280 345, 140 345, 95 310 C 70 270, 220 275, 265 228 C 280 195, 215 180, 172 142 C 145 125, 120 100, 105 82 C 90 60, 82 30, 80 0';
+  'M 155 550 C 185 505, 245 460, 275 405 C 275 360, 145 360, 110 318 C 85 278, 225 280, 270 228 C 285 195, 220 180, 175 145 C 145 125, 125 100, 115 80 C 105 55, 95 25, 90 0';
 
 // Segment subpaths for completed progression
 const BEZIER_SEGMENTS: string[] = [
-  'M 145 535 C 175 490, 245 445, 280 388',
-  'M 280 388 C 280 345, 140 345, 95 310',
-  'M 95 310 C 70 270, 220 275, 265 228',
-  'M 265 228 C 280 195, 215 180, 172 142',
-  'M 172 142 C 145 125, 120 100, 105 82',
-  'M 105 82 C 90 60, 82 30, 80 0',
+  'M 155 550 C 185 505, 245 460, 275 405',
+  'M 275 405 C 275 360, 145 360, 110 318',
+  'M 110 318 C 85 278, 225 280, 270 228',
+  'M 270 228 C 285 195, 220 180, 175 145',
+  'M 175 145 C 145 125, 125 100, 115 80',
+  'M 115 80 C 105 55, 95 25, 90 0',
 ];
 
 export function renderAdventureJourneyMap(ctx: AppContext): string {
@@ -119,70 +119,71 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
           <div class="journey-cloud c3"></div>
           <div class="journey-cloud c4"></div>
 
-          <!-- SVG 3D Curved Highway Ribbon Layer -->
+          <!-- SVG 3D Cobblestone Trail Ribbon -->
           <svg class="journey-road-svg" viewBox="0 0 400 680" preserveAspectRatio="none" aria-hidden="true">
             <defs>
-              <linearGradient id="roadTerracotta" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#f97316"/>
-                <stop offset="45%" stop-color="#ea580c"/>
-                <stop offset="100%" stop-color="#c2410c"/>
+              <linearGradient id="trailTerracotta" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#fb923c"/>
+                <stop offset="50%" stop-color="#ea580c"/>
+                <stop offset="100%" stop-color="#9a3412"/>
               </linearGradient>
-              <linearGradient id="roadStone" x1="0" y1="0" x2="1" y2="1">
+              <linearGradient id="trailCobble" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#ffffff"/>
-                <stop offset="40%" stop-color="#f8fafc"/>
-                <stop offset="100%" stop-color="#e2e8f0"/>
+                <stop offset="50%" stop-color="#f8fafc"/>
+                <stop offset="100%" stop-color="#cbd5e1"/>
               </linearGradient>
             </defs>
 
-            <!-- Soft Ambient Extrusion Shadow cast onto alpine landscape -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(10, 25, 47, 0.45)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" transform="translate(4, 8)"/>
+            <!-- Soft Landscape Ground Shadow -->
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(15, 35, 20, 0.35)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" transform="translate(3, 7)"/>
 
-            <!-- Paved Stone Road Curb & Ribbon (Upcoming / Locked Section) -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#cbd5e1" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="url(#roadStone)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#94a3b8" stroke-width="3.5" stroke-dasharray="10 8" stroke-linecap="round"/>
+            <!-- Cobblestone Curb & Surface (Upcoming / Locked Section) -->
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#94a3b8" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="url(#trailCobble)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#64748b" stroke-width="2.5" stroke-dasharray="8 7" stroke-linecap="round"/>
 
-            <!-- Completed Terracotta Road Section (Active Progression from Node 1 to Current) -->
+            <!-- Completed Golden Trail Section -->
             ${completedSegments.map(seg => `
-              <path d="${seg}" fill="none" stroke="#7c2d12" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="${seg}" fill="none" stroke="url(#roadTerracotta)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="${seg}" fill="none" stroke="#fef08a" stroke-width="3.5" stroke-dasharray="10 8" stroke-linecap="round"/>
+              <path d="${seg}" fill="none" stroke="#7c2d12" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="${seg}" fill="none" stroke="url(#trailTerracotta)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="${seg}" fill="none" stroke="#fef08a" stroke-width="2.5" stroke-dasharray="8 7" stroke-linecap="round"/>
             `).join('')}
           </svg>
 
-          <!-- Intermediate Stepping Dots / Stones (Matching Reference Image) -->
+          <!-- Intermediate Stepping Pearls along the trail -->
           ${MAP_SLOTS.map((slot, sIdx) => {
             const isCompletedSlot = sIdx < activeSlotIdx;
             return slot.dots.map(d => {
               const leftPct = (d.x / 400) * 100;
               const topPct = (d.y / 680) * 100;
               return `
-                <div class="journey-step-dot ${isCompletedSlot ? 'done' : 'future'}"
+                <div class="journey-step-pearl ${isCompletedSlot ? 'done' : 'future'}"
                   style="left:${leftPct}%;top:${topPct}%"
                   aria-hidden="true">
-                  ${isCompletedSlot ? '<span>✕</span>' : ''}
+                  <span class="pearl-core">${isCompletedSlot ? '✓' : ''}</span>
                 </div>
               `;
             }).join('');
           }).join('')}
 
-          <!-- Milestone Level Nodes (Level 1 Big Gold, Levels 2+ 3D White Stone Tablets) -->
+          <!-- Milestone Level Nodes: Circular 3D Game Medallions -->
           ${levels.map((lvl, idx) => {
             const slot = MAP_SLOTS[idx];
             if (!slot) return '';
             const leftPct = (slot.x / 400) * 100;
             const topPct = (slot.y / 680) * 100;
-            const isFirst = idx === 0;
-            const isBoss = lvl.isBossCheckpoint || (lvl.levelNumber % 10 === 0);
-            const isUnlocked = lvl.unlocked || lvl.levelNumber <= highestLvl;
+            const isBoss = idx === levels.length - 1 || lvl.isBossCheckpoint;
             const isCompleted = lvl.completed || lvl.levelNumber < highestLvl;
+            const isActive = lvl.levelNumber === highestLvl;
+            const isLocked = !isCompleted && !isActive;
 
             const nodeClass = [
               'journey-node',
-              isFirst ? 'first-gold' : 'stone',
-              isBoss ? 'boss' : '',
-              isUnlocked ? 'open' : 'locked',
-              isCompleted ? 'done' : '',
+              'node-medallion',
+              isCompleted ? 'is-completed' : '',
+              isActive ? 'is-active' : '',
+              isLocked ? 'is-locked' : '',
+              isBoss ? 'is-boss' : '',
             ].filter(Boolean).join(' ');
 
             return `
@@ -191,32 +192,40 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
                 style="left:${leftPct}%;top:${topPct}%"
                 title="${esc(lvl.title || `Stage ${lvl.levelNumber}`)}">
                 
-                ${isFirst ? `
-                  <div class="journey-node-gold">
-                    <strong>${lvl.levelNumber}</strong>
+                ${isBoss ? `
+                  <div class="medallion-body boss">
+                    <span class="boss-crown-badge">👑</span>
+                    <strong class="medallion-num">${lvl.levelNumber}</strong>
+                  </div>
+                ` : isCompleted ? `
+                  <div class="medallion-body completed">
+                    <strong class="medallion-num">${lvl.levelNumber}</strong>
+                    <div class="medallion-stars">
+                      <span>★</span><span>★</span><span>★</span>
+                    </div>
+                  </div>
+                ` : isActive ? `
+                  <div class="medallion-body active">
+                    <div class="active-pulse-ring"></div>
+                    <strong class="medallion-num">${lvl.levelNumber}</strong>
                   </div>
                 ` : `
-                  <div class="journey-node-stone">
-                    <strong>${lvl.levelNumber}</strong>
+                  <div class="medallion-body locked">
+                    <span class="medallion-lock">🔒</span>
+                    <strong class="medallion-num">${lvl.levelNumber}</strong>
                   </div>
                 `}
-
-                ${isCompleted ? `
-                  <div class="journey-node-stars">
-                    <span>★</span><span>★</span><span>★</span>
-                  </div>
-                ` : ''}
               </button>
             `;
           }).join('')}
 
-          <!-- Floating Player Avatar Token & Speech Bubble "Booo" -->
+          <!-- Floating Player Avatar Token & Speech Bubble "Booo" perched on active node -->
           <div class="journey-avatar-token"
             id="journey-avatar-token"
-            style="left:${avatarX}%;top:calc(${(avatarY / 680) * 100}% - 46px)">
+            style="left:${avatarX}%;top:calc(${(avatarY / 680) * 100}% - 56px)">
             <div class="journey-bubble">Booo</div>
             <div class="journey-avatar-badge">
-              ${svgBoooMascot(44)}
+              ${svgBoooMascot(46)}
             </div>
           </div>
         </div>
