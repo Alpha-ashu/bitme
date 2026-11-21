@@ -4,6 +4,7 @@ import {
   imgBundleSprite,
   svgAvatarBadge,
   svgCloseX,
+  svgCrownIcon,
   svgKingdomBadge,
   svgModeBadge,
   svgNavIcon,
@@ -70,10 +71,13 @@ function renderHomePage(ctx: AppContext): string {
 
   const tier = getViewportTier();
   const quickIds: UIMode[] = ['explorer', 'free_roam', 'battle_royale', 'team', 'boss', 'nokia'];
-  const perPage = tier === 'tiny' ? 1 : tier === 'landscape' ? 3 : tier === 'mobile' ? 2 : 6;
+  const perPage = tier === 'tiny' ? 2 : tier === 'landscape' ? 3 : tier === 'mobile' ? 4 : 6;
   const totalPages = Math.max(1, Math.ceil(quickIds.length / perPage));
   menuUiState.homeModePage = Math.max(0, Math.min(menuUiState.homeModePage, totalPages - 1));
   const slice = quickIds.slice(menuUiState.homeModePage * perPage, menuUiState.homeModePage * perPage + perPage);
+
+  const activeLevel = Number(state.adventure?.axes?.highestUnlockedLevel || 1);
+  const storyChapter = curKingdom.n || 1;
 
   return `
     <div class="home-stage">
@@ -115,7 +119,7 @@ function renderHomePage(ctx: AppContext): string {
       ${tier === 'tablet' || tier === 'desktop' ? adSlotPlaceholder('home_screen', 'home-ad-banner') : ''}
 
       <div class="page-hdr home-quick-hdr">
-        <h3>Quick Launch</h3>
+        <h3>Featured Game Modes</h3>
         ${totalPages > 1 ? `
           <div class="pill-group">
             <button class="btn btn-xs btn-soft" data-home-page="-1" ${menuUiState.homeModePage === 0 ? 'disabled' : ''}>◀</button>
@@ -125,7 +129,7 @@ function renderHomePage(ctx: AppContext): string {
         ` : ''}
       </div>
 
-      <div class="quick-mode-grid" style="grid-template-columns:repeat(${Math.min(slice.length || 2, perPage === 6 ? 3 : perPage)}, minmax(0,1fr))">
+      <div class="quick-mode-grid" style="grid-template-columns:repeat(${Math.min(slice.length || 2, perPage === 6 ? 3 : 2)}, minmax(0,1fr))">
         ${slice.map(id => {
           const m = UI_MODES[id];
           return `
@@ -140,6 +144,27 @@ function renderHomePage(ctx: AppContext): string {
           `;
         }).join('')}
       </div>
+
+      <!-- Active Realm Campaign Spotlight Banner (Fills Mobile Void & Drives Story Retention) -->
+      <section class="home-quest-banner" data-nav="story" role="button" tabindex="0" aria-label="Continue Story Adventure">
+        <div class="hqb-badge">
+          ${svgCrownIcon(1, 30)}
+        </div>
+        <div class="hqb-info">
+          <div class="hqb-header-row">
+            <span class="hqb-tag">CAMPAIGN · CHAPTER ${storyChapter}</span>
+            <span class="hqb-reward">+${storyChapter * 150} ★ Star Coins</span>
+          </div>
+          <strong class="hqb-title">${esc(curKingdom.name || 'Emerald Hollow')} · Stage ${activeLevel}</strong>
+          <p class="hqb-sub">Winding alpine trail awaits — complete stages to unlock rewards</p>
+          <div class="hqb-progress-wrap">
+            <div class="hud-bar gold" style="height:6px"><div style="width:${Math.min(100, Math.max(10, ((activeLevel % 10) || 1) * 10))}%"></div></div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-gold hqb-cta" data-nav="story">
+          Continue ▶
+        </button>
+      </section>
     </div>
   `;
 }

@@ -113,47 +113,85 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
       <!-- Scrollable Continuous Trail Map Canvas -->
       <div class="journey-map-scroll" id="journey-map-scroll">
         <div class="journey-map-canvas">
-          <!-- Alpine Mountain Valley & Turquoise Glacial Lake Landscape Artwork -->
+          <!-- Alpine Mountain Valley & Turquoise Glacial Lake Landscape Artwork (Matching Reference) -->
           <svg class="journey-landscape-svg" viewBox="0 0 400 740" preserveAspectRatio="none" aria-hidden="true">
             <defs>
-              <linearGradient id="grassSlope" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#34d399"/>
-                <stop offset="22%" stop-color="#10b981"/>
-                <stop offset="55%" stop-color="#059669"/>
-                <stop offset="85%" stop-color="#047857"/>
-                <stop offset="100%" stop-color="#064e3b"/>
+              <!-- Sunlit Alpine Grassy Mountain Slope Base -->
+              <linearGradient id="valleyBase" x1="0" y1="0" x2="0.3" y2="1">
+                <stop offset="0%" stop-color="#4ade80"/>
+                <stop offset="18%" stop-color="#22c55e"/>
+                <stop offset="42%" stop-color="#16a34a"/>
+                <stop offset="70%" stop-color="#15803d"/>
+                <stop offset="100%" stop-color="#14532d"/>
               </linearGradient>
-              <linearGradient id="fjordWater" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#67e8f9"/>
-                <stop offset="30%" stop-color="#06b6d4"/>
-                <stop offset="70%" stop-color="#0284c7"/>
-                <stop offset="100%" stop-color="#0369a1"/>
+
+              <!-- Mountain Ridge Sunlit Highlight -->
+              <linearGradient id="ridgeSun" x1="0" y1="0" x2="1" y2="0.6">
+                <stop offset="0%" stop-color="#86efac"/>
+                <stop offset="40%" stop-color="#4ade80"/>
+                <stop offset="100%" stop-color="#16a34a"/>
               </linearGradient>
-              <radialGradient id="pineCluster" cx="40%" cy="30%" r="65%">
-                <stop offset="0%" stop-color="#065f46"/>
+
+              <!-- Deep Mountain Shadow Ravine -->
+              <linearGradient id="ravineShade" x1="0" y1="0" x2="0.8" y2="1">
+                <stop offset="0%" stop-color="#166534"/>
+                <stop offset="60%" stop-color="#14532d"/>
+                <stop offset="100%" stop-color="#052e16"/>
+              </linearGradient>
+
+              <!-- Turquoise Glacial Fjord Water (Matching Reference Image) -->
+              <linearGradient id="glacialFjord" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#a5f3fc"/>
+                <stop offset="15%" stop-color="#38bdf8"/>
+                <stop offset="45%" stop-color="#06b6d4"/>
+                <stop offset="75%" stop-color="#0284c7"/>
+                <stop offset="100%" stop-color="#075985"/>
+              </linearGradient>
+
+              <!-- Pine Forest Clusters on Mountain Slopes -->
+              <radialGradient id="pineForest" cx="35%" cy="30%" r="70%">
+                <stop offset="0%" stop-color="#166534"/>
+                <stop offset="50%" stop-color="#14532d"/>
                 <stop offset="100%" stop-color="#022c22"/>
               </radialGradient>
             </defs>
 
-            <!-- Rolling Alpine Slopes Base -->
-            <rect width="400" height="740" fill="url(#grassSlope)"/>
+            <!-- Rolling Alpine Valley Base -->
+            <rect width="400" height="740" fill="url(#valleyBase)"/>
 
-            <!-- Lower Glacial Mountain Lake (Framing Node 1 & 2) -->
-            <path d="M-15 480 C35 480, 85 520, 95 580 C105 640, 50 710, -15 730 Z" fill="url(#fjordWater)" opacity="0.92"/>
-            <path d="M-15 480 C35 480, 85 520, 95 580 C105 640, 50 710, -15 730 Z" fill="none" stroke="#a5f3fc" stroke-width="3" opacity="0.6"/>
-            <path d="M5 520 C35 540, 65 580, 75 640" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+            <!-- Top Mountain Ridges & Shading -->
+            <path d="M-20 -20 L220 -20 C180 50, 110 90, 40 120 C-10 140, -20 180, -20 180 Z" fill="url(#ridgeSun)" opacity="0.85"/>
+            <path d="M180 -20 L420 -20 L420 160 C360 140, 310 110, 260 70 C220 40, 190 0, 180 -20 Z" fill="url(#ravineShade)" opacity="0.75"/>
 
-            <!-- Upper Glacial Fjord (Winding between Node 2, 3, and 4) -->
-            <path d="M415 220 C320 230, 260 270, 215 310 C165 355, 110 365, -15 355 L-15 415 C60 430, 140 425, 200 385 C260 345, 330 325, 415 335 Z" fill="url(#fjordWater)" opacity="0.95"/>
-            <path d="M415 220 C320 230, 260 270, 215 310 C165 355, 110 365, -15 355 L-15 415 C60 430, 140 425, 200 385 C260 345, 330 325, 415 335 Z" fill="none" stroke="#a5f3fc" stroke-width="3.5" opacity="0.65"/>
-            <path d="M30 385 Q110 380 170 375" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
-            <path d="M240 335 Q295 310 375 295" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+            <!-- Central Mountain Spur (Between Stage 3 & 4) -->
+            <path d="M-20 220 C60 210, 140 230, 180 270 C210 300, 160 330, 90 340 C20 350, -20 370, -20 370 Z" fill="url(#ridgeSun)" opacity="0.9"/>
+            <path d="M420 280 C360 270, 310 290, 270 330 C240 360, 270 390, 330 400 C390 410, 420 430, 420 430 Z" fill="url(#ravineShade)" opacity="0.85"/>
 
-            <!-- Pine Foliage Clusters on Slopes -->
-            <ellipse cx="60" cy="270" rx="42" ry="26" fill="url(#pineCluster)" opacity="0.45"/>
-            <ellipse cx="340" cy="490" rx="55" ry="32" fill="url(#pineCluster)" opacity="0.5"/>
-            <ellipse cx="320" cy="110" rx="48" ry="28" fill="url(#pineCluster)" opacity="0.42"/>
-            <ellipse cx="40" cy="90" rx="36" ry="22" fill="url(#pineCluster)" opacity="0.4"/>
+            <!-- Lower Mountain Ridge (Framing Stage 1 & 2) -->
+            <path d="M120 760 C140 680, 220 640, 280 620 C340 600, 420 630, 420 630 L420 760 Z" fill="url(#ridgeSun)" opacity="0.9"/>
+            <path d="M-20 600 C30 590, 90 620, 110 670 C120 700, 100 730, 60 760 L-20 760 Z" fill="url(#ravineShade)" opacity="0.8"/>
+
+            <!-- Deep Glacial Alpine Fjord (Winding through the central valley) -->
+            <!-- Lower Lake Basin (Beside Stage 1 & below Stage 2) -->
+            <path d="M-20 490 C40 480, 110 520, 120 580 C130 650, 60 720, -20 740 Z" fill="url(#glacialFjord)"/>
+            <path d="M-20 490 C40 480, 110 520, 120 580 C130 650, 60 720, -20 740 Z" fill="none" stroke="#e0f2fe" stroke-width="2.5" opacity="0.7"/>
+            <path d="M10 530 C45 550, 80 590, 95 650" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>
+
+            <!-- Upper Glacial Fjord (Winding between Stage 2, 3, 4, 5) -->
+            <path d="M420 230 C330 240, 270 280, 225 320 C175 365, 115 375, -20 365 L-20 425 C60 440, 145 435, 210 395 C270 355, 340 335, 420 345 Z" fill="url(#glacialFjord)"/>
+            <path d="M420 230 C330 240, 270 280, 225 320 C175 365, 115 375, -20 365 L-20 425 C60 440, 145 435, 210 395 C270 355, 340 335, 420 345 Z" fill="none" stroke="#e0f2fe" stroke-width="3" opacity="0.75"/>
+            <path d="M30 390 Q120 385 180 380" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+            <path d="M250 340 Q310 315 390 300" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+
+            <!-- Pine Forest Canopy Clusters on Mountain Slopes (Matching Reference) -->
+            <ellipse cx="65" cy="275" rx="46" ry="28" fill="url(#pineForest)" opacity="0.65"/>
+            <ellipse cx="50" cy="260" rx="30" ry="20" fill="url(#pineForest)" opacity="0.75"/>
+            <ellipse cx="345" cy="495" rx="58" ry="34" fill="url(#pineForest)" opacity="0.7"/>
+            <ellipse cx="365" cy="520" rx="40" ry="25" fill="url(#pineForest)" opacity="0.8"/>
+            <ellipse cx="330" cy="115" rx="52" ry="30" fill="url(#pineForest)" opacity="0.6"/>
+            <ellipse cx="45" cy="95" rx="38" ry="24" fill="url(#pineForest)" opacity="0.55"/>
+            <ellipse cx="160" cy="690" rx="50" ry="30" fill="url(#pineForest)" opacity="0.7"/>
+            <ellipse cx="270" cy="180" rx="42" ry="24" fill="url(#pineForest)" opacity="0.55"/>
           </svg>
 
           <!-- Floating Clouds (Top-altitude Depth Atmosphere matching reference) -->
