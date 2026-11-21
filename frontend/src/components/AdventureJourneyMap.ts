@@ -23,25 +23,25 @@ interface MapSlot {
 }
 
 const MAP_SLOTS: MapSlot[] = [
-  { x: 150, y: 525, dots: [{ x: 172, y: 485 }, { x: 208, y: 450 }, { x: 246, y: 422 }] },
-  { x: 275, y: 395, dots: [{ x: 245, y: 362 }, { x: 195, y: 348 }, { x: 142, y: 330 }] },
-  { x: 95, y: 310, dots: [{ x: 140, y: 278 }, { x: 205, y: 258 }] },
-  { x: 265, y: 232, dots: [{ x: 238, y: 196 }, { x: 200, y: 172 }] },
-  { x: 175, y: 152, dots: [{ x: 138, y: 118 }] },
-  { x: 105, y: 88, dots: [{ x: 90, y: 45 }] },
+  { x: 145, y: 535, dots: [{ x: 185, y: 495 }, { x: 230, y: 455 }, { x: 268, y: 420 }] },
+  { x: 280, y: 388, dots: [{ x: 240, y: 355 }, { x: 185, y: 342 }, { x: 135, y: 330 }] },
+  { x: 95, y: 310, dots: [{ x: 142, y: 275 }, { x: 208, y: 250 }] },
+  { x: 265, y: 228, dots: [{ x: 235, y: 188 }, { x: 200, y: 165 }] },
+  { x: 172, y: 142, dots: [{ x: 138, y: 112 }] },
+  { x: 105, y: 82, dots: [{ x: 90, y: 45 }] },
 ];
 
 const BEZIER_PATH_FULL =
-  'M 150 525 C 175 480, 245 445, 275 395 C 275 350, 140 350, 95 310 C 70 270, 220 275, 265 232 C 280 195, 215 180, 175 152 C 145 130, 120 105, 105 88 C 90 60, 82 30, 80 0';
+  'M 145 535 C 175 490, 245 445, 280 388 C 280 345, 140 345, 95 310 C 70 270, 220 275, 265 228 C 280 195, 215 180, 172 142 C 145 125, 120 100, 105 82 C 90 60, 82 30, 80 0';
 
 // Segment subpaths for completed progression
 const BEZIER_SEGMENTS: string[] = [
-  'M 150 525 C 175 480, 245 445, 275 395',
-  'M 275 395 C 275 350, 140 350, 95 310',
-  'M 95 310 C 70 270, 220 275, 265 232',
-  'M 265 232 C 280 195, 215 180, 175 152',
-  'M 175 152 C 145 130, 120 105, 105 88',
-  'M 105 88 C 90 60, 82 30, 80 0',
+  'M 145 535 C 175 490, 245 445, 280 388',
+  'M 280 388 C 280 345, 140 345, 95 310',
+  'M 95 310 C 70 270, 220 275, 265 228',
+  'M 265 228 C 280 195, 215 180, 172 142',
+  'M 172 142 C 145 125, 120 100, 105 82',
+  'M 105 82 C 90 60, 82 30, 80 0',
 ];
 
 export function renderAdventureJourneyMap(ctx: AppContext): string {
@@ -135,17 +135,17 @@ export function renderAdventureJourneyMap(ctx: AppContext): string {
             </defs>
 
             <!-- Soft Ambient Extrusion Shadow cast onto alpine landscape -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(15, 23, 42, 0.42)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" transform="translate(3, 7)"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="rgba(10, 25, 47, 0.45)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" transform="translate(4, 8)"/>
 
             <!-- Paved Stone Road Curb & Ribbon (Upcoming / Locked Section) -->
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#cbd5e1" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="url(#roadStone)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#cbd5e1" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${BEZIER_PATH_FULL}" fill="none" stroke="url(#roadStone)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="${BEZIER_PATH_FULL}" fill="none" stroke="#94a3b8" stroke-width="3.5" stroke-dasharray="10 8" stroke-linecap="round"/>
 
             <!-- Completed Terracotta Road Section (Active Progression from Node 1 to Current) -->
             ${completedSegments.map(seg => `
-              <path d="${seg}" fill="none" stroke="#7c2d12" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="${seg}" fill="none" stroke="url(#roadTerracotta)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="${seg}" fill="none" stroke="#7c2d12" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="${seg}" fill="none" stroke="url(#roadTerracotta)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="${seg}" fill="none" stroke="#fef08a" stroke-width="3.5" stroke-dasharray="10 8" stroke-linecap="round"/>
             `).join('')}
           </svg>
