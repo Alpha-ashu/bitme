@@ -56,7 +56,9 @@
 
 html, body {
   width: 100%;
-  height: 100%;
+  height: var(--app-vh, 100dvh);
+  min-height: 100%;
+  max-height: 100%;
   overflow: hidden;
   font-family: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
   color: #064e3b;
@@ -140,10 +142,21 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
 @keyframes cqLoad { from { width: 32%; } to { width: 92%; } }
 
 /* ── App Shell (Strict 100dvh Zero Scrollbar Frame) ─────────── */
+#app {
+  width: 100%;
+  height: var(--app-vh, 100dvh);
+  min-height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
 .app-shell {
   width: 100%;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -307,7 +320,77 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   overflow: hidden;
 }
 
-.mobile-bottom-nav, .mob-hub-backdrop { display: none; }
+/* ── Floating Mobile Bottom Navigation Bar (Glass Pill Design) ── */
+.mobile-bottom-nav {
+  display: none;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  position: fixed;
+  bottom: calc(8px + var(--safe-b));
+  left: max(10px, var(--safe-l));
+  right: max(10px, var(--safe-r));
+  max-width: 490px;
+  margin: 0 auto;
+  z-index: 40;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 2px solid #bbf7d0;
+  border-radius: 26px;
+  padding: 6px;
+  box-shadow: 0 16px 36px rgba(16, 185, 129, 0.22), 0 4px 14px rgba(0, 0, 0, 0.08), inset 0 1px 0 #ffffff;
+}
+
+.mob-nav-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 3px 2px;
+  border-radius: 18px;
+  font: inherit;
+  color: #64748b;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease;
+}
+.mob-nav-btn span {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.mob-nav-btn small {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+.mob-nav-btn.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+}
+.mob-nav-btn.active span {
+  transform: scale(1.1);
+}
+.mob-nav-btn.active small {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.mob-nav-btn.active svg {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+}
+
+.mob-hub-backdrop { display: none; }
 
 /* ── Elevated White & Pastel Game Cards + Ribbons ──────────── */
 .panel {
@@ -493,7 +576,16 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
 .pager-dots { font-family: 'Fredoka', sans-serif; font-size: 12.5px; font-weight: 700; color: var(--emerald-deep); }
 
 /* ── Home Stage (Ref 5 Streak & Game Hub Aesthetic) ────────── */
-.home-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 9px; }
+.home-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(88px + var(--safe-b));
+}
 
 .hero-card {
   display: grid;
@@ -719,6 +811,104 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   font-weight: 800;
   border-radius: 999px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Daily Missions / Challenges Spotlight Preview (Home Screen Height Balance) ── */
+.home-missions-spotlight {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+  border: 2px solid #bbf7d0;
+  box-shadow: inset 0 1.5px 0 #ffffff, 0 3.5px 0 #86efac, 0 10px 22px rgba(16, 185, 129, 0.12);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+.home-missions-spotlight:hover {
+  transform: translateY(-1px);
+  border-color: #86efac;
+}
+.home-missions-spotlight:active {
+  transform: translateY(1px);
+}
+.hms-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hms-title-lockup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #064e3b;
+}
+.hms-ico {
+  font-size: 16px;
+}
+.hms-pill {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2.5px 8.5px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.hms-quests {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hms-q-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  background: #ffffff;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+}
+.hms-q-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  background: #f1f5f9;
+  color: #94a3b8;
+  border: 1px solid #cbd5e1;
+  flex-shrink: 0;
+}
+.hms-q-check.done {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #059669;
+}
+.hms-q-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #1e293b;
+}
+.hms-q-reward {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #b45309;
+  flex-shrink: 0;
 }
 
 /* ── Spotlight Mode Picker (Ref 4 Green Focus Card) ────────── */
@@ -1854,29 +2044,49 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   .nav-btn em { display: none; }
 }
 
-@media (max-width: 767px), (max-height: 520px) {
-  /* Full-bleed immersive Story Journey Map on mobile */
-  .app-shell.page-story .app-topbar {
-    display: none !important;
-  }
-  .app-shell.page-story .app-workspace {
-    padding: 0 !important;
-    gap: 0 !important;
-    height: 100dvh;
-    max-width: 100%;
-  }
-  .app-shell.page-story .app-main {
-    height: 100dvh;
-    padding: 0 !important;
-    max-width: 100%;
-  }
-  .app-shell.page-story .journey-map-wrap {
-    border-radius: 0;
-    box-shadow: none;
-    height: 100dvh;
-    padding-bottom: calc(64px + var(--safe-b));
-  }
+/* ── Global Full-Bleed Immersive Story Journey Map ─────────── */
+.app-shell.page-story {
+  background: transparent;
+}
+.app-shell.page-story .app-topbar {
+  display: none !important;
+}
+.app-shell.page-story .app-workspace {
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: none !important;
+}
+.app-shell.page-story .app-sidebar {
+  display: none !important;
+}
+.app-shell.page-story .app-main {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  flex: 1 !important;
+}
+.app-shell.page-story .journey-map-wrap {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  background: url('/assets/adventure_map_bg.jpg') center center / cover no-repeat, #064e3b !important;
+  padding-bottom: calc(72px + var(--safe-b));
+}
+.app-shell.page-story .mobile-bottom-nav {
+  display: grid !important;
+}
 
+@media (max-width: 767px), (max-height: 520px) {
   .app-workspace {
     grid-template-columns: minmax(0, 1fr);
     padding: 8px calc(10px + var(--safe-r)) calc(74px + var(--safe-b)) calc(10px + var(--safe-l));
@@ -1887,70 +2097,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 
   .mobile-bottom-nav {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 4px;
-    position: fixed;
-    bottom: calc(8px + var(--safe-b));
-    left: max(10px, var(--safe-l));
-    right: max(10px, var(--safe-r));
-    max-width: 490px;
-    margin: 0 auto;
-    z-index: 40;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
-    border: 2px solid #bbf7d0;
-    border-radius: 26px;
-    padding: 6px;
-    box-shadow: 0 16px 36px rgba(16, 185, 129, 0.22), 0 4px 14px rgba(0, 0, 0, 0.08), inset 0 1px 0 #ffffff;
-  }
-  .mob-nav-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    min-height: 48px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 3px 2px;
-    border-radius: 18px;
-    font: inherit;
-    color: #64748b;
-    cursor: pointer;
-    transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease;
-  }
-  .mob-nav-btn span {
-    display: grid;
-    place-items: center;
-    line-height: 1;
-    transition: transform 0.15s ease;
-  }
-  .mob-nav-btn small {
-    font-family: 'Fredoka', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-    white-space: nowrap;
-    letter-spacing: 0.02em;
-    color: #64748b;
-  }
-  .mob-nav-btn.active {
-    color: #ffffff;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    border-color: rgba(255, 255, 255, 0.5);
-    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    transform: translateY(-2px);
-  }
-  .mob-nav-btn.active span {
-    transform: scale(1.1);
-  }
-  .mob-nav-btn.active small {
-    color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  }
-  .mob-nav-btn.active svg {
-    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
   }
 
   .mob-hub-backdrop {
@@ -2715,9 +2861,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  background: #064e3b;
-  border-radius: 24px;
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
+  background: url('/assets/adventure_map_bg.jpg') center center / cover no-repeat, #064e3b;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* Floating Top HUD */
@@ -2776,7 +2922,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   font-size: 13.5px;
   font-weight: 800;
   color: #064e3b;
-  max-width: 220px;
+  max-width: min(320px, calc(100vw - 180px));
   min-width: 0;
   flex-shrink: 1;
 }
@@ -2858,12 +3004,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
 .journey-map-canvas {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  max-width: min(100%, 640px);
   margin: 0 auto;
-  min-height: 740px;
+  min-height: max(100%, 720px);
   height: 100%;
-  background: url('/assets/adventure_map_bg.jpg') center top / 100% 100% no-repeat, #064e3b;
-  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.25);
+  background: transparent;
+  box-shadow: none;
 }
 
 /* Floating cloud layers matching alpine reference */

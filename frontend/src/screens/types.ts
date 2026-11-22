@@ -271,7 +271,7 @@ export type ViewportTier = 'tiny' | 'mobile' | 'landscape' | 'tablet' | 'desktop
 export function getViewportTier(): ViewportTier {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  if (h <= 520) return 'landscape';
+  if (h <= 520 && w > h) return 'landscape';
   if (w < 370) return 'tiny';
   if (w < 768) return 'mobile';
   if (w < 1024) return 'tablet';

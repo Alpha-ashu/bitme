@@ -166,6 +166,37 @@ function renderHomePage(ctx: AppContext): string {
           Continue ▶
         </button>
       </section>
+
+      <!-- Daily Quest Preview Strip (Balances screen height & removes empty void) -->
+      <section class="home-missions-spotlight" data-nav="missions" role="button" tabindex="0" aria-label="View Daily Quests">
+        <div class="hms-hdr">
+          <div class="hms-title-lockup">
+            <span class="hms-ico">🎯</span>
+            <strong>Daily Quests</strong>
+          </div>
+          <span class="hms-pill">${dailyDone}/${dailyTot || 2} Done</span>
+        </div>
+        <div class="hms-quests">
+          ${(state.missions || []).filter(m => m.category === 'daily').slice(0, 2).map(m => `
+            <div class="hms-q-row">
+              <span class="hms-q-check ${m.isCompleted ? 'done' : ''}">${m.isCompleted ? '✓' : '○'}</span>
+              <span class="hms-q-text uname-ellipsis">${esc(m.title)}</span>
+              <span class="hms-q-reward">+${m.rewardStars || 25}★</span>
+            </div>
+          `).join('') || `
+            <div class="hms-q-row">
+              <span class="hms-q-check done">✓</span>
+              <span class="hms-q-text">Log in &amp; explore realms</span>
+              <span class="hms-q-reward">+50★</span>
+            </div>
+            <div class="hms-q-row">
+              <span class="hms-q-check">○</span>
+              <span class="hms-q-text">Complete 1 Story Stage</span>
+              <span class="hms-q-reward">+100★</span>
+            </div>
+          `}
+        </div>
+      </section>
     </div>
   `;
 }

@@ -75,6 +75,12 @@ class AnacondaParkApp {
   private pinchDist = 0;
   private inputBound = false;
 
+  // Viewport tracking & responsive metrics
+  private lastViewportTier: ViewportTier = getViewportTier();
+  private lastViewportWidth = typeof window !== 'undefined' ? window.innerWidth : 390;
+  private lastViewportHeight = typeof window !== 'undefined' ? window.innerHeight : 844;
+  private resizeDebounceTimer: any = null;
+
   public state: AppRuntimeState;
 
   constructor() {
@@ -194,16 +200,54 @@ class AnacondaParkApp {
     (window as any).__coilQuestApp = this;
     (window as any).__coilQuestCtx = this.ctx;
 
-    let lastTier = getViewportTier();
-    window.addEventListener('resize', () => {
-      const next = getViewportTier();
-      if (next !== lastTier && this.state.screen === 'app') {
-        lastTier = next;
-        this.render();
-      }
+    this.syncViewportMetrics(true);
+    window.addEventListener('resize', () => this.handleViewportResize());
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.syncViewportMetrics(true), 120);
     });
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => this.handleViewportResize());
+    }
 
     void this.boot();
+  }
+
+  private syncViewportMetrics(forceRender = false) {
+    if (typeof window === 'undefined') return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const dvh = window.visualViewport ? window.visualViewport.height : h;
+    const root = document.documentElement;
+    root.style.setProperty('--app-vw', `${w}px`);
+    root.style.setProperty('--app-vh', `${h}px`);
+    root.style.setProperty('--app-dvh', `${dvh}px`);
+    root.style.setProperty('--vh', `${h * 0.01}px`);
+
+    const tier = getViewportTier();
+    root.setAttribute('data-tier', tier);
+    root.setAttribute('data-orientation', w >= h ? 'landscape' : 'portrait');
+
+    const tierChanged = tier !== this.lastViewportTier;
+    const sizeDelta = Math.abs(w - this.lastViewportWidth) > 16 || Math.abs(h - this.lastViewportHeight) > 16;
+
+    if (tierChanged || sizeDelta || forceRender) {
+      this.lastViewportTier = tier;
+      this.lastViewportWidth = w;
+      this.lastViewportHeight = h;
+
+      if (this.state.screen === 'play') {
+        this.renderer?.resize();
+      } else if (this.state.screen === 'app' || this.state.screen === 'pause' || this.state.screen === 'summary') {
+        this.render();
+      }
+    }
+  }
+
+  private handleViewportResize() {
+    clearTimeout(this.resizeDebounceTimer);
+    this.resizeDebounceTimer = setTimeout(() => {
+      this.syncViewportMetrics();
+    }, 80);
   }
 
   private applySettingsToDom() {
