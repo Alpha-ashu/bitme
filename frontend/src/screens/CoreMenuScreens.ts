@@ -1,4 +1,5 @@
 import { api, fmtNum, fmtTime } from '../api/ApiClient';
+import { audio } from '../game/AudioSystem';
 import { adSlotPlaceholder, mountAdSlots } from '../components/AdBanner';
 import {
   imgBundleSprite,
@@ -40,7 +41,7 @@ const menuUiState = {
   lobbyPage: 0,
   profileTab: 'identity' as 'identity' | 'stats' | 'history',
   profileHistPage: 0,
-  settingsTab: 'controls' as 'controls' | 'audio',
+  settingsTab: 'controls' as 'controls' | 'audio' | 'display',
 };
 
 const LEVEL_TYPE_ICON: Record<string, string> = {
@@ -174,7 +175,7 @@ function renderPlayModePage(ctx: AppContext): string {
   const sel = ctx.state.selectedUIMode;
   const m = UI_MODES[sel];
   return `
-    <div class="screen-fill">
+    <div class="screen-fill settings-scrollable">
       <div class="page-hdr">
         <h2>Modes</h2>
         <span class="pill">7 Game Modes</span>
@@ -354,7 +355,7 @@ function renderLobbyPage(ctx: AppContext): string {
   `;
 
   return `
-    <div class="screen-fill">
+    <div class="screen-fill settings-scrollable">
       <div class="page-hdr">
         <h2>Lobby</h2>
         <div class="pill-group">
@@ -578,7 +579,7 @@ function renderStoryPage(ctx: AppContext): string {
   `;
 
   return `
-    <div class="screen-fill">
+    <div class="screen-fill settings-scrollable">
       <div class="page-hdr">
         <h2>Adventure</h2>
         <div class="form-actions">
@@ -700,7 +701,7 @@ function renderProfilePage(ctx: AppContext): string {
   `;
 
   return `
-    <div class="screen-fill">
+    <div class="screen-fill settings-scrollable">
       <div class="page-hdr">
         <h2>Profile</h2>
         <div class="form-actions">
@@ -728,84 +729,288 @@ function renderProfilePage(ctx: AppContext): string {
 
 function renderSettingsPage(ctx: AppContext): string {
   const st = ctx.state.settings;
-  const tier = getViewportTier();
-  const isCompact = tier === 'tiny' || tier === 'mobile' || tier === 'landscape';
+  const joySize = st.joySize || 'medium';
+  const previewJoyPx = joySize === 'mini' ? 44 : joySize === 'small' ? 52 : joySize === 'large' ? 68 : joySize === 'huge' ? 76 : 60;
+  const joyOpacity = ((st.joyOpacity ?? 65) / 100).toFixed(2);
+  const btnScaleMap: Record<string, number> = { compact: 0.82, normal: 1.0, large: 1.18, jumbo: 1.35 };
+  const btnScale = btnScaleMap[st.buttonScale || 'normal'] || 1.0;
+  const btnOpacity = ((st.buttonOpacity ?? 85) / 100).toFixed(2);
+  const layout = st.buttonLayout || (st.controlPos === 'right' ? 'reversed' : 'classic');
 
   const controlsPanel = `
-    <section class="panel stack-form">
-      <h3>Controls &amp; HUD</h3>
+    <section class="panel stack-form settings-card">
+      <!-- Live HUD Interactive Preview Card -->
+      <div class="settings-preview-card">
+        <div class="spc-hdr">
+          <span class="spc-title">📱 Live HUD Preview</span>
+          <span class="spc-tag">${st.joyMode === 'floating' ? 'Dynamic Floating' : 'Fixed Rim'} · ${layout.replace('_', ' ')}</span>
+        </div>
+        <div class="spc-stage preview-layout-${layout}">
+          <div class="spc-side-left">
+            <div class="spc-util-row">
+              ${st.showMapBtn !== false ? '<span class="spc-btn sm">🗺️</span>' : ''}
+              ${st.showZoomBtn !== false ? '<span class="spc-btn sm">🔍</span>' : ''}
+            </div>
+            <span class="spc-btn ability" style="transform:scale(${btnScale});opacity:${btnOpacity}">🛡️</span>
+          </div>
+          <div class="spc-joy-wrap" style="width:${previewJoyPx}px;height:${previewJoyPx}px;opacity:${joyOpacity}">
+            <div class="spc-joy-knob"></div>
+          </div>
+          <div class="spc-side-right">
+            <span class="spc-btn boost" style="transform:scale(${btnScale});opacity:${btnOpacity}">⚡</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Joystick Configuration -->
+      <div class="setting-group-hdr">
+        <h4>🕹️ Joystick Controls</h4>
+      </div>
+
       <div class="form-row-2">
-        <label>Control Side
+        <label>Joystick Mode
+          <select id="set-joy-mode">
+            <option value="fixed" ${st.joyMode !== 'floating' ? 'selected' : ''}>Fixed (Pinned Position)</option>
+            <option value="floating" ${st.joyMode === 'floating' ? 'selected' : ''}>Floating (Dynamic Under Touch)</option>
+          </select>
+        </label>
+        <label>Placement Side
           <select id="set-ctrl-pos">
-            <option value="left" ${st.controlPos === 'left' ? 'selected' : ''}>Center Joy · Guard Left</option>
-            <option value="right" ${st.controlPos === 'right' ? 'selected' : ''}>Center Joy · Guard Right</option>
+            <option value="center" ${st.controlPos === 'center' ? 'selected' : ''}>Center Joy (Split Flanks)</option>
+            <option value="left" ${st.controlPos === 'left' ? 'selected' : ''}>Left Side Joy</option>
+            <option value="right" ${st.controlPos === 'right' ? 'selected' : ''}>Right Side Joy (Lefty)</option>
           </select>
         </label>
-        <label>Joystick Size
+      </div>
+
+      <div class="form-row-2">
+        <label>Joystick Sizing
           <select id="set-joy-size">
-            <option value="small" ${st.joySize === 'small' ? 'selected' : ''}>Small</option>
-            <option value="medium" ${st.joySize === 'medium' ? 'selected' : ''}>Medium</option>
-            <option value="large" ${st.joySize === 'large' ? 'selected' : ''}>Large</option>
+            <option value="mini" ${st.joySize === 'mini' ? 'selected' : ''}>Mini (78px)</option>
+            <option value="small" ${st.joySize === 'small' ? 'selected' : ''}>Small (92px)</option>
+            <option value="medium" ${st.joySize === 'medium' || !st.joySize ? 'selected' : ''}>Medium (112px)</option>
+            <option value="large" ${st.joySize === 'large' ? 'selected' : ''}>Large (132px)</option>
+            <option value="huge" ${st.joySize === 'huge' ? 'selected' : ''}>Jumbo (156px)</option>
+          </select>
+        </label>
+        <label>Joystick Opacity (${st.joyOpacity ?? 65}%)
+          <input id="set-joy-opacity" type="range" min="20" max="100" step="5" value="${st.joyOpacity ?? 65}" />
+        </label>
+      </div>
+
+      <div class="form-row-2">
+        <label>Sensitivity (${(st.joySensitivity || 1.0).toFixed(1)}×)
+          <input id="set-joy-sens" type="range" min="0.5" max="2.0" step="0.1" value="${st.joySensitivity || 1.0}" />
+        </label>
+        <label>Dead-Zone (${st.joyDeadZone || 6}px)
+          <input id="set-joy-dz" type="range" min="2" max="25" step="1" value="${st.joyDeadZone || 6}" />
+        </label>
+      </div>
+
+      <label class="wood-switch">
+        <div>
+          <span>Outer-Rim Sprint Boost</span>
+          <small style="display:block;font-size:11px;opacity:0.75">Deflecting stick to outer edge automatically boosts speed</small>
+        </div>
+        <input id="set-joy-edge-boost" type="checkbox" ${st.joyEdgeBoost !== false ? 'checked' : ''} />
+      </label>
+
+      <hr class="sep" />
+
+      <!-- Action Buttons Configuration -->
+      <div class="setting-group-hdr">
+        <h4>🔘 Action Buttons &amp; Layout</h4>
+      </div>
+
+      <div class="form-row-2">
+        <label>Layout Preset
+          <select id="set-btn-layout">
+            <option value="classic" ${st.buttonLayout === 'classic' || !st.buttonLayout ? 'selected' : ''}>Classic Split (Joy Center · Guard Left · Boost Right)</option>
+            <option value="reversed" ${st.buttonLayout === 'reversed' ? 'selected' : ''}>Inverted Lefty (Joy Center · Boost Left · Guard Right)</option>
+            <option value="compact_right" ${st.buttonLayout === 'compact_right' ? 'selected' : ''}>Compact Right (Guard &amp; Boost Clustered Right)</option>
+            <option value="left_cluster" ${st.buttonLayout === 'left_cluster' ? 'selected' : ''}>Left Cluster (Guard &amp; Boost Clustered Left)</option>
+          </select>
+        </label>
+        <label>Button Scale
+          <select id="set-btn-scale">
+            <option value="compact" ${st.buttonScale === 'compact' ? 'selected' : ''}>Compact (82%)</option>
+            <option value="normal" ${st.buttonScale === 'normal' || !st.buttonScale ? 'selected' : ''}>Standard (100%)</option>
+            <option value="large" ${st.buttonScale === 'large' ? 'selected' : ''}>Large (118%)</option>
+            <option value="jumbo" ${st.buttonScale === 'jumbo' ? 'selected' : ''}>Jumbo (135%)</option>
           </select>
         </label>
       </div>
-      <div class="form-row-2">
-        <label>Camera Preset
-          <select id="set-cam">
-            <option value="near" ${st.cameraPreset === 'near' ? 'selected' : ''}>Near</option>
-            <option value="medium" ${st.cameraPreset === 'medium' ? 'selected' : ''}>Medium</option>
-            <option value="far" ${st.cameraPreset === 'far' ? 'selected' : ''}>Far</option>
-            <option value="ultra_wide" ${st.cameraPreset === 'ultra_wide' ? 'selected' : ''}>Ultra Wide</option>
-          </select>
-        </label>
-        <label>Quest Tracker
-          <select id="set-trk-pos">
-            <option value="left" ${st.trackerPos === 'left' ? 'selected' : ''}>Left</option>
-            <option value="right" ${st.trackerPos === 'right' ? 'selected' : ''}>Right</option>
-          </select>
-        </label>
-      </div>
-      <label>Sensitivity (${(st.joySensitivity || 1.0).toFixed(1)}×)
-        <input id="set-joy-sens" type="range" min="0.6" max="1.6" step="0.1" value="${st.joySensitivity || 1.0}" />
+
+      <label>Button Opacity (${st.buttonOpacity ?? 85}%)
+        <input id="set-btn-opacity" type="range" min="30" max="100" step="5" value="${st.buttonOpacity ?? 85}" />
       </label>
-      <label>Dead-Zone (${st.joyDeadZone}px)
-        <input id="set-joy-dz" type="range" min="2" max="20" step="1" value="${st.joyDeadZone}" />
-      </label>
-      <div class="form-row-2">
-        <label class="wood-switch"><span>Minimap</span><input id="set-minimap" type="checkbox" ${st.showMinimap ? 'checked' : ''} /></label>
-        <label class="wood-switch"><span>Quests</span><input id="set-tracker" type="checkbox" ${st.missionTracker ? 'checked' : ''} /></label>
+
+      <div class="switch-grid">
+        <label class="wood-switch">
+          <span>Minimap Quick-Button</span>
+          <input id="set-show-map-btn" type="checkbox" ${st.showMapBtn !== false ? 'checked' : ''} />
+        </label>
+        <label class="wood-switch">
+          <span>Zoom Quick-Button</span>
+          <input id="set-show-zoom-btn" type="checkbox" ${st.showZoomBtn !== false ? 'checked' : ''} />
+        </label>
+        <label class="wood-switch">
+          <span>Power-up Bar</span>
+          <input id="set-show-powerup-bar" type="checkbox" ${st.showPowerupBar !== false ? 'checked' : ''} />
+        </label>
+        <label class="wood-switch">
+          <span>Haptic Vibration</span>
+          <input id="set-haptics" type="checkbox" ${st.haptics !== false ? 'checked' : ''} />
+        </label>
       </div>
     </section>
   `;
 
   const audioPanel = `
-    <section class="panel stack-form">
-      <h3>Audio &amp; Display</h3>
-      <label class="wood-switch"><span>Sound Effects</span><input id="set-sfx" type="checkbox" ${st.sfx ? 'checked' : ''} /></label>
-      <label class="wood-switch"><span>Synth Music</span><input id="set-music" type="checkbox" ${st.music ? 'checked' : ''} /></label>
-      <label class="wood-switch"><span>Reduce Motion</span><input id="set-reduce-motion" type="checkbox" ${st.reduceMotion ? 'checked' : ''} /></label>
-      <label class="wood-switch"><span>Large Text</span><input id="set-large-text" type="checkbox" ${st.largeText ? 'checked' : ''} /></label>
-      <label class="wood-switch"><span>High Contrast</span><input id="set-contrast" type="checkbox" ${st.highContrast ? 'checked' : ''} /></label>
+    <section class="panel stack-form settings-card">
+      <div class="setting-group-hdr">
+        <h4>🔊 Audio &amp; Sound Mix</h4>
+      </div>
+
+      <div class="audio-volume-block">
+        <label class="slider-with-val">
+          <div class="swv-hdr">
+            <span>Master Volume</span>
+            <strong id="lbl-master-vol">${st.masterVolume ?? 80}%</strong>
+          </div>
+          <input id="set-master-vol" type="range" min="0" max="100" step="5" value="${st.masterVolume ?? 80}" />
+        </label>
+      </div>
+
+      <div class="audio-channel-card">
+        <div class="acc-row">
+          <label class="wood-switch" style="margin:0">
+            <span>Sound Effects (SFX)</span>
+            <input id="set-sfx" type="checkbox" ${st.sfx ? 'checked' : ''} />
+          </label>
+          <button id="btn-test-sfx" type="button" class="btn btn-xs btn-gold">🔔 Test SFX</button>
+        </div>
+        <label class="slider-with-val">
+          <div class="swv-hdr">
+            <small>SFX Volume</small>
+            <span id="lbl-sfx-vol">${st.sfxVolume ?? 85}%</span>
+          </div>
+          <input id="set-sfx-vol" type="range" min="0" max="100" step="5" value="${st.sfxVolume ?? 85}" />
+        </label>
+      </div>
+
+      <div class="audio-channel-card">
+        <div class="acc-row">
+          <label class="wood-switch" style="margin:0">
+            <span>Background Music (BGM)</span>
+            <input id="set-music" type="checkbox" ${st.music ? 'checked' : ''} />
+          </label>
+          <button id="btn-test-music" type="button" class="btn btn-xs btn-gold">🎵 Test Music</button>
+        </div>
+        <label class="slider-with-val">
+          <div class="swv-hdr">
+            <small>Music Volume</small>
+            <span id="lbl-music-vol">${st.musicVolume ?? 60}%</span>
+          </div>
+          <input id="set-music-vol" type="range" min="0" max="100" step="5" value="${st.musicVolume ?? 60}" />
+        </label>
+      </div>
+
       <hr class="sep" />
-      <button id="set-open-admin" class="btn btn-sm btn-soft">Admin Portal</button>
+
+      <div class="setting-group-hdr">
+        <h4>🍃 Atmosphere &amp; Tactile Feedback</h4>
+      </div>
+
+      <div class="switch-grid">
+        <label class="wood-switch">
+          <div>
+            <span>Meadow Ambiance</span>
+            <small style="display:block;font-size:11px;opacity:0.75">Gentle serene breeze in game</small>
+          </div>
+          <input id="set-ambient" type="checkbox" ${st.ambientAudio !== false ? 'checked' : ''} />
+        </label>
+        <label class="wood-switch">
+          <div>
+            <span>UI Click Sounds</span>
+            <small style="display:block;font-size:11px;opacity:0.75">Audio feedback on buttons</small>
+          </div>
+          <input id="set-ui-clicks" type="checkbox" ${st.uiClicks !== false ? 'checked' : ''} />
+        </label>
+        <label class="wood-switch">
+          <div>
+            <span>Tactile Haptics</span>
+            <small style="display:block;font-size:11px;opacity:0.75">Vibration on power activation</small>
+          </div>
+          <input id="set-haptics-audio" type="checkbox" ${st.haptics !== false ? 'checked' : ''} />
+        </label>
+      </div>
+    </section>
+  `;
+
+  const displayPanel = `
+    <section class="panel stack-form settings-card">
+      <div class="setting-group-hdr">
+        <h4>🎥 Camera &amp; Viewport</h4>
+      </div>
+
+      <div class="form-row-2">
+        <label>Camera Distance
+          <select id="set-cam">
+            <option value="near" ${st.cameraPreset === 'near' ? 'selected' : ''}>Near (Close Action)</option>
+            <option value="medium" ${st.cameraPreset === 'medium' ? 'selected' : ''}>Medium (Arcade Balanced)</option>
+            <option value="far" ${st.cameraPreset === 'far' ? 'selected' : ''}>Far (Tactical Overview)</option>
+            <option value="ultra_wide" ${st.cameraPreset === 'ultra_wide' ? 'selected' : ''}>Ultra Wide (Expansive)</option>
+          </select>
+        </label>
+        <label>Quest Tracker Side
+          <select id="set-trk-pos">
+            <option value="left" ${st.trackerPos === 'left' ? 'selected' : ''}>Left Side</option>
+            <option value="right" ${st.trackerPos === 'right' ? 'selected' : ''}>Right Side</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="switch-grid">
+        <label class="wood-switch"><span>Show In-Game Minimap</span><input id="set-minimap" type="checkbox" ${st.showMinimap ? 'checked' : ''} /></label>
+        <label class="wood-switch"><span>Story Quest HUD Tracker</span><input id="set-tracker" type="checkbox" ${st.missionTracker ? 'checked' : ''} /></label>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="setting-group-hdr">
+        <h4>♿ Accessibility</h4>
+      </div>
+
+      <div class="switch-grid">
+        <label class="wood-switch"><span>Reduce Motion</span><input id="set-reduce-motion" type="checkbox" ${st.reduceMotion ? 'checked' : ''} /></label>
+        <label class="wood-switch"><span>Large Text</span><input id="set-large-text" type="checkbox" ${st.largeText ? 'checked' : ''} /></label>
+        <label class="wood-switch"><span>High Contrast Mode</span><input id="set-contrast" type="checkbox" ${st.highContrast ? 'checked' : ''} /></label>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="form-row-2" style="margin-top:4px">
+        <button id="set-tut-inner" type="button" class="btn btn-sm btn-gold">📖 How to Play Tutorial</button>
+        <button id="set-open-admin" type="button" class="btn btn-sm btn-soft">🛠️ Admin &amp; Dev Portal</button>
+      </div>
     </section>
   `;
 
   return `
-    <div class="screen-fill">
+    <div class="screen-fill settings-scrollable">
       <div class="page-hdr">
-        <h2>Settings</h2>
+        <h2>Game Settings</h2>
         <button id="set-tut" class="btn btn-xs btn-gold">How to Play</button>
       </div>
-      ${isCompact ? `
-        <div class="seg-pill" style="align-self:flex-start">
-          <button class="seg-btn ${menuUiState.settingsTab === 'controls' ? 'active' : ''}" data-set-tab="controls">Controls</button>
-          <button class="seg-btn ${menuUiState.settingsTab === 'audio' ? 'active' : ''}" data-set-tab="audio">Audio &amp; App</button>
-        </div>
-        ${menuUiState.settingsTab === 'controls' ? controlsPanel : audioPanel}
-      ` : `
-        <div class="admin-split">${controlsPanel}${audioPanel}</div>
-      `}
+
+      <div class="seg-pill settings-tabs" style="align-self:flex-start">
+        <button class="seg-btn ${menuUiState.settingsTab === 'controls' ? 'active' : ''}" data-set-tab="controls">🕹️ Controls</button>
+        <button class="seg-btn ${menuUiState.settingsTab === 'audio' ? 'active' : ''}" data-set-tab="audio">🔊 Sound</button>
+        <button class="seg-btn ${menuUiState.settingsTab === 'display' ? 'active' : ''}" data-set-tab="display">🎨 Display</button>
+      </div>
+
+      ${menuUiState.settingsTab === 'controls' ? controlsPanel : menuUiState.settingsTab === 'audio' ? audioPanel : displayPanel}
     </div>
   `;
 }
@@ -1208,21 +1413,78 @@ function bindMenuEvents(root: HTMLElement, ctx: AppContext, hubItems: Array<{ id
     await ctx.refreshProfile();
   });
 
-  // Settings Tabs & Events
+  // Settings Tabs & Granular Customization Events
   root.querySelectorAll<HTMLElement>('[data-set-tab]').forEach(b => {
-    b.addEventListener('click', () => { menuUiState.settingsTab = b.dataset.setTab as any; ctx.render(); });
+    b.addEventListener('click', () => {
+      audio.playClick();
+      menuUiState.settingsTab = b.dataset.setTab as any;
+      ctx.render();
+    });
   });
-  root.querySelector('#set-tut')?.addEventListener('click', () => ctx.openTutorialModal());
+  root.querySelector('#set-tut')?.addEventListener('click', () => { audio.playClick(); ctx.openTutorialModal(); });
+  root.querySelector('#set-tut-inner')?.addEventListener('click', () => { audio.playClick(); ctx.openTutorialModal(); });
+  root.querySelector('#set-open-admin')?.addEventListener('click', () => { audio.playClick(); ctx.setScreen('admin'); });
+
+  // Controls bindings
+  root.querySelector('#set-joy-mode')?.addEventListener('change', (e) => ctx.updateSettings({ joyMode: (e.target as HTMLSelectElement).value as any }));
   root.querySelector('#set-ctrl-pos')?.addEventListener('change', (e) => ctx.updateSettings({ controlPos: (e.target as HTMLSelectElement).value as any }));
   root.querySelector('#set-joy-size')?.addEventListener('change', (e) => ctx.updateSettings({ joySize: (e.target as HTMLSelectElement).value as any }));
-  root.querySelector('#set-joy-sens')?.addEventListener('change', (e) => ctx.updateSettings({ joySensitivity: Number((e.target as HTMLInputElement).value) }));
-  root.querySelector('#set-joy-dz')?.addEventListener('change', (e) => ctx.updateSettings({ joyDeadZone: Number((e.target as HTMLInputElement).value) }));
+  root.querySelector('#set-joy-opacity')?.addEventListener('input', (e) => ctx.updateSettings({ joyOpacity: Number((e.target as HTMLInputElement).value) }));
+  root.querySelector('#set-joy-sens')?.addEventListener('input', (e) => ctx.updateSettings({ joySensitivity: Number((e.target as HTMLInputElement).value) }));
+  root.querySelector('#set-joy-dz')?.addEventListener('input', (e) => ctx.updateSettings({ joyDeadZone: Number((e.target as HTMLInputElement).value) }));
+  root.querySelector('#set-joy-edge-boost')?.addEventListener('change', (e) => ctx.updateSettings({ joyEdgeBoost: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-btn-layout')?.addEventListener('change', (e) => ctx.updateSettings({ buttonLayout: (e.target as HTMLSelectElement).value as any }));
+  root.querySelector('#set-btn-scale')?.addEventListener('change', (e) => ctx.updateSettings({ buttonScale: (e.target as HTMLSelectElement).value as any }));
+  root.querySelector('#set-btn-opacity')?.addEventListener('input', (e) => ctx.updateSettings({ buttonOpacity: Number((e.target as HTMLInputElement).value) }));
+  root.querySelector('#set-show-map-btn')?.addEventListener('change', (e) => ctx.updateSettings({ showMapBtn: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-show-zoom-btn')?.addEventListener('change', (e) => ctx.updateSettings({ showZoomBtn: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-show-powerup-bar')?.addEventListener('change', (e) => ctx.updateSettings({ showPowerupBar: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-haptics')?.addEventListener('change', (e) => {
+    const on = (e.target as HTMLInputElement).checked;
+    ctx.updateSettings({ haptics: on });
+    if (on) audio.vibrate(30);
+  });
+
+  // Audio bindings
+  root.querySelector('#set-master-vol')?.addEventListener('input', (e) => {
+    const val = Number((e.target as HTMLInputElement).value);
+    const lbl = root.querySelector('#lbl-master-vol');
+    if (lbl) lbl.textContent = `${val}%`;
+    ctx.updateSettings({ masterVolume: val });
+  });
+  root.querySelector('#set-sfx')?.addEventListener('change', (e) => ctx.updateSettings({ sfx: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-sfx-vol')?.addEventListener('input', (e) => {
+    const val = Number((e.target as HTMLInputElement).value);
+    const lbl = root.querySelector('#lbl-sfx-vol');
+    if (lbl) lbl.textContent = `${val}%`;
+    ctx.updateSettings({ sfxVolume: val });
+  });
+  root.querySelector('#btn-test-sfx')?.addEventListener('click', () => {
+    audio.testSfx();
+  });
+  root.querySelector('#set-music')?.addEventListener('change', (e) => ctx.updateSettings({ music: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-music-vol')?.addEventListener('input', (e) => {
+    const val = Number((e.target as HTMLInputElement).value);
+    const lbl = root.querySelector('#lbl-music-vol');
+    if (lbl) lbl.textContent = `${val}%`;
+    ctx.updateSettings({ musicVolume: val });
+  });
+  root.querySelector('#btn-test-music')?.addEventListener('click', () => {
+    audio.testMusic();
+  });
+  root.querySelector('#set-ambient')?.addEventListener('change', (e) => ctx.updateSettings({ ambientAudio: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-ui-clicks')?.addEventListener('change', (e) => ctx.updateSettings({ uiClicks: (e.target as HTMLInputElement).checked }));
+  root.querySelector('#set-haptics-audio')?.addEventListener('change', (e) => {
+    const on = (e.target as HTMLInputElement).checked;
+    ctx.updateSettings({ haptics: on });
+    if (on) audio.vibrate(30);
+  });
+
+  // Display & Accessibility bindings
   root.querySelector('#set-cam')?.addEventListener('change', (e) => ctx.updateSettings({ cameraPreset: (e.target as HTMLSelectElement).value as any }));
   root.querySelector('#set-trk-pos')?.addEventListener('change', (e) => ctx.updateSettings({ trackerPos: (e.target as HTMLSelectElement).value as any }));
   root.querySelector('#set-minimap')?.addEventListener('change', (e) => ctx.updateSettings({ showMinimap: (e.target as HTMLInputElement).checked }));
   root.querySelector('#set-tracker')?.addEventListener('change', (e) => ctx.updateSettings({ missionTracker: (e.target as HTMLInputElement).checked }));
-  root.querySelector('#set-sfx')?.addEventListener('change', (e) => ctx.updateSettings({ sfx: (e.target as HTMLInputElement).checked }));
-  root.querySelector('#set-music')?.addEventListener('change', (e) => ctx.updateSettings({ music: (e.target as HTMLInputElement).checked }));
   root.querySelector('#set-reduce-motion')?.addEventListener('change', (e) => ctx.updateSettings({ reduceMotion: (e.target as HTMLInputElement).checked }));
   root.querySelector('#set-large-text')?.addEventListener('change', (e) => ctx.updateSettings({ largeText: (e.target as HTMLInputElement).checked }));
   root.querySelector('#set-contrast')?.addEventListener('change', (e) => ctx.updateSettings({ highContrast: (e.target as HTMLInputElement).checked }));

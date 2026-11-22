@@ -253,6 +253,12 @@ class AnacondaParkApp {
     this.applySettingsToDom();
     if (patch.sfx !== undefined) audio.setSfxEnabled(this.state.settings.sfx);
     if (patch.music !== undefined) audio.setMusicEnabled(this.state.settings.music);
+    if (patch.masterVolume !== undefined) audio.setMasterVolume(this.state.settings.masterVolume ?? 80);
+    if (patch.sfxVolume !== undefined) audio.setSfxVolume(this.state.settings.sfxVolume ?? 85);
+    if (patch.musicVolume !== undefined) audio.setMusicVolume(this.state.settings.musicVolume ?? 60);
+    if (patch.ambientAudio !== undefined) audio.setAmbientEnabled(this.state.settings.ambientAudio ?? true);
+    if (patch.uiClicks !== undefined) audio.setUiClicksEnabled(this.state.settings.uiClicks !== false);
+    if (patch.haptics !== undefined) audio.setHapticsEnabled(this.state.settings.haptics !== false);
     this.render();
   }
 
@@ -1236,14 +1242,35 @@ class AnacondaParkApp {
           return;
         }
         const t = e.touches[0];
-        if ((e.target as HTMLElement)?.closest('button, .touch-btn, .hud-board, .npc-prompt')) return;
+        if ((e.target as HTMLElement)?.closest('button, .touch-btn, .hud-board, .npc-prompt, .desk-actions')) return;
         const joyEl = document.getElementById('touch-joystick');
-        if (joyEl && (e.target === joyEl || joyEl.contains(e.target as Node))) {
-          const rect = joyEl.getBoundingClientRect();
-          this.joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-          this.joyRadius = rect.width / 2;
-          this.joyId = t.identifier;
-          this.updateJoyPos(t.clientX, t.clientY);
+        if (!joyEl) return;
+
+        const isFloating = this.state.settings.joyMode === 'floating';
+        if (isFloating) {
+          const yPct = t.clientY / window.innerHeight;
+          // Floating mode: tap anywhere in lower 65% of screen to spawn joystick
+          if (yPct >= 0.35) {
+            joyEl.style.left = `${t.clientX}px`;
+            joyEl.style.top = `${t.clientY}px`;
+            joyEl.style.transform = 'translate(-50%, -50%)';
+            joyEl.classList.add('joy-active');
+
+            const rect = joyEl.getBoundingClientRect();
+            this.joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            this.joyRadius = rect.width / 2;
+            this.joyId = t.identifier;
+            this.updateJoyPos(t.clientX, t.clientY);
+          }
+        } else {
+          if (e.target === joyEl || joyEl.contains(e.target as Node)) {
+            const rect = joyEl.getBoundingClientRect();
+            this.joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            this.joyRadius = rect.width / 2;
+            this.joyId = t.identifier;
+            joyEl.classList.add('joy-active');
+            this.updateJoyPos(t.clientX, t.clientY);
+          }
         }
       }, { passive: true });
 
@@ -1275,6 +1302,15 @@ class AnacondaParkApp {
             this.joyBoost = false;
             const knob = document.getElementById('touch-knob');
             if (knob) knob.style.transform = 'translate(-50%,-50%)';
+            const joyEl = document.getElementById('touch-joystick');
+            if (joyEl) {
+              joyEl.classList.remove('joy-active');
+              if (this.state.settings.joyMode === 'floating') {
+                joyEl.style.left = '';
+                joyEl.style.top = '';
+                joyEl.style.transform = '';
+              }
+            }
           }
         }
         if (e.touches.length < 2) this.pinchDist = 0;
@@ -1303,8 +1339,9 @@ class AnacondaParkApp {
     const dy = y - this.joyCenter.y;
     const dist = Math.hypot(dx, dy);
     const deadZone = this.state.settings.joyDeadZone || 6;
-    const sens = Math.max(0.6, Math.min(1.6, this.state.settings.joySensitivity || 1.0));
+    const sens = Math.max(0.5, Math.min(2.0, this.state.settings.joySensitivity || 1.0));
     const maxR = Math.max(24, this.joyRadius * 0.78);
+    const edgeBoostEnabled = this.state.settings.joyEdgeBoost !== false;
     let kx = 0;
     let ky = 0;
     if (dist > deadZone) {
@@ -1313,7 +1350,7 @@ class AnacondaParkApp {
       const clamped = Math.min(dist * sens, maxR);
       kx = Math.cos(ang) * clamped;
       ky = Math.sin(ang) * clamped;
-      this.joyBoost = clamped >= maxR * 0.88;
+      this.joyBoost = edgeBoostEnabled ? clamped >= maxR * 0.86 : false;
     } else {
       this.joyBoost = false;
     }
@@ -1322,10 +1359,26 @@ class AnacondaParkApp {
   }
 
   private bindTouchHudButtons() {
+    const triggerHaptics = (ms = 22) => {
+      if (this.state.settings.haptics !== false) {
+        audio.vibrate(ms);
+      }
+    };
+
     const boost = document.getElementById('touch-boost');
     if (boost) {
-      const on = (e: Event) => { e.preventDefault(); e.stopPropagation(); this.keyBoost = true; boost.classList.add('active'); };
-      const off = (e: Event) => { e.stopPropagation(); this.keyBoost = false; boost.classList.remove('active'); };
+      const on = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.keyBoost = true;
+        boost.classList.add('active');
+        triggerHaptics(25);
+      };
+      const off = (e: Event) => {
+        e.stopPropagation();
+        this.keyBoost = false;
+        boost.classList.remove('active');
+      };
       boost.addEventListener('touchstart', on, { passive: false });
       boost.addEventListener('touchend', off);
       boost.addEventListener('touchcancel', off);
@@ -1334,19 +1387,33 @@ class AnacondaParkApp {
     }
     const ab = document.getElementById('touch-ability');
     if (ab) {
-      const fire = (e: Event) => { e.preventDefault(); e.stopPropagation(); this.ctx.activateAbility(); };
+      const fire = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.ctx.activateAbility();
+        triggerHaptics(35);
+      };
       ab.addEventListener('touchstart', fire, { passive: false });
       ab.addEventListener('click', fire);
     }
     const zoom = document.getElementById('touch-zoom');
     if (zoom) {
-      const fire = (e: Event) => { e.preventDefault(); e.stopPropagation(); this.ctx.cycleZoom(); };
+      const fire = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.ctx.cycleZoom();
+        triggerHaptics(15);
+      };
       zoom.addEventListener('touchstart', fire, { passive: false });
       zoom.addEventListener('click', fire);
     }
     const mini = document.getElementById('touch-mini');
     if (mini) {
-      mini.addEventListener('click', (e) => { e.stopPropagation(); this.ctx.openTacticalMap(); });
+      mini.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.ctx.openTacticalMap();
+        triggerHaptics(15);
+      });
     }
   }
 

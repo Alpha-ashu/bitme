@@ -118,13 +118,28 @@ export const TUTORIAL_SLIDES = [
 export interface Settings {
   sfx: boolean;
   music: boolean;
+  masterVolume?: number;
+  sfxVolume?: number;
+  musicVolume?: number;
+  ambientAudio?: boolean;
+  uiClicks?: boolean;
+  haptics?: boolean;
   largeText: boolean;
   reduceMotion: boolean;
   highContrast: boolean;
-  controlPos: 'left' | 'right';
-  joySize: 'small' | 'medium' | 'large';
+  controlPos: 'left' | 'right' | 'center';
+  joySize: 'mini' | 'small' | 'medium' | 'large' | 'huge';
+  joyMode?: 'fixed' | 'floating';
+  joyOpacity?: number;
   joyDeadZone: number;
   joySensitivity: number;
+  joyEdgeBoost?: boolean;
+  buttonLayout?: 'classic' | 'reversed' | 'compact_right' | 'left_cluster';
+  buttonScale?: 'compact' | 'normal' | 'large' | 'jumbo';
+  buttonOpacity?: number;
+  showZoomBtn?: boolean;
+  showMapBtn?: boolean;
+  showPowerupBar?: boolean;
   cameraPreset: 'near' | 'medium' | 'far' | 'ultra_wide';
   missionTracker: boolean;
   trackerPos: 'left' | 'right';
@@ -134,13 +149,28 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   sfx: true,
   music: false,
+  masterVolume: 80,
+  sfxVolume: 85,
+  musicVolume: 60,
+  ambientAudio: true,
+  uiClicks: true,
+  haptics: true,
   largeText: false,
   reduceMotion: false,
   highContrast: false,
-  controlPos: 'left',
+  controlPos: 'center',
   joySize: 'medium',
+  joyMode: 'fixed',
+  joyOpacity: 65,
   joyDeadZone: 6,
   joySensitivity: 1.0,
+  joyEdgeBoost: true,
+  buttonLayout: 'classic',
+  buttonScale: 'normal',
+  buttonOpacity: 85,
+  showZoomBtn: true,
+  showMapBtn: true,
+  showPowerupBar: true,
   cameraPreset: 'medium',
   missionTracker: true,
   trackerPos: 'left',

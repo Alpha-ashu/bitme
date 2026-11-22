@@ -240,7 +240,17 @@ export function renderGameplayScreen(
   const boss = mode === 'boss' ? st?.snakes?.find(s => s.isBoss && s.isAlive) : undefined;
   const rightSide = state.settings.controlPos === 'right';
   const trackerRight = state.settings.trackerPos === 'right';
-  const joyPx = state.settings.joySize === 'small' ? 92 : state.settings.joySize === 'large' ? 132 : 112;
+  const joySize = state.settings.joySize;
+  const joyPx = joySize === 'mini' ? 78 : joySize === 'small' ? 92 : joySize === 'large' ? 132 : joySize === 'huge' ? 156 : 112;
+  const joyOpacity = ((state.settings.joyOpacity ?? 65) / 100).toFixed(2);
+  const btnScaleMap: Record<string, number> = { compact: 0.82, normal: 1.0, large: 1.18, jumbo: 1.35 };
+  const btnScale = btnScaleMap[state.settings.buttonScale || 'normal'] || 1.0;
+  const btnOpacity = ((state.settings.buttonOpacity ?? 85) / 100).toFixed(2);
+  const layoutPreset = state.settings.buttonLayout || (rightSide ? 'reversed' : 'classic');
+  const isFloatingJoy = state.settings.joyMode === 'floating';
+  const showMapBtn = state.settings.showMapBtn !== false;
+  const showZoomBtn = state.settings.showZoomBtn !== false;
+  const showPowerupBar = state.settings.showPowerupBar !== false;
 
   const isTimed = mode === 'team' || mode === 'boss' || mode === 'battle_royale' || mode === 'event';
   const defaultSec = mode === 'boss' ? 150 : 180;
@@ -377,7 +387,7 @@ export function renderGameplayScreen(
         ${leaderboardHtml}
         ${hudCenterVitals}
         <div id="active-quest-hud-slot"></div>
-        ${chargeBarHtml}
+        ${showPowerupBar ? chargeBarHtml : ''}
         <div id="npc-approach-chip-slot"></div>
         <div id="npc-modal-slot"></div>
         <div id="quiz-modal-slot"></div>
@@ -389,18 +399,22 @@ export function renderGameplayScreen(
           <button id="desk-mini" class="btn btn-sm btn-soft">Map [M]</button>
         </div>
 
-        <!-- Mobile / Tablet Touch Controls: Divided Left & Right Powers + Centered Precision Joystick (50% opacity) -->
-        <div class="touch-hud touch-divided ${rightSide ? 'swap-sides' : ''}">
+        <!-- Mobile / Tablet Touch Controls: Divided Left & Right Powers + Precision Joystick -->
+        <div class="touch-hud touch-divided layout-${layoutPreset} ${rightSide ? 'swap-sides' : ''}" style="--joy-size:${joyPx}px;--joy-opacity:${joyOpacity};--btn-scale:${btnScale};--btn-opacity:${btnOpacity}">
           <div class="touch-side-left">
             <div class="touch-util-row">
-              <button id="touch-mini" class="touch-btn sm" aria-label="Arena Map (Safe Pause)">
-                ${svgMiniMapBtnIcon()}
-                <span class="tbtn-micro">MAP</span>
-              </button>
-              <button id="touch-zoom" class="touch-btn sm" aria-label="Camera Zoom">
-                ${svgMiniZoomBtnIcon()}
-                <span id="touch-zoom-label" class="tbtn-micro" style="font-size:7px;line-height:1;opacity:0.8">${zoomLbl}</span>
-              </button>
+              ${showMapBtn ? `
+                <button id="touch-mini" class="touch-btn sm" aria-label="Arena Map (Safe Pause)">
+                  ${svgMiniMapBtnIcon()}
+                  <span class="tbtn-micro">MAP</span>
+                </button>
+              ` : ''}
+              ${showZoomBtn ? `
+                <button id="touch-zoom" class="touch-btn sm" aria-label="Camera Zoom">
+                  ${svgMiniZoomBtnIcon()}
+                  <span id="touch-zoom-label" class="tbtn-micro" style="font-size:7px;line-height:1;opacity:0.8">${zoomLbl}</span>
+                </button>
+              ` : ''}
             </div>
             <button id="touch-ability" class="touch-btn ${abCd > 0 ? 'cd' : ''} ${shieldSec > 0 ? 'buff-active' : ''}" aria-label="Guard Shield Power">
               ${svgFoodPreview('shield', 28)}
@@ -408,7 +422,7 @@ export function renderGameplayScreen(
             </button>
           </div>
 
-          <div id="touch-joystick" class="touch-joystick" style="--joy-size:${joyPx}px" aria-label="Movement Joystick">
+          <div id="touch-joystick" class="touch-joystick ${isFloatingJoy ? 'floating-mode' : ''}" style="--joy-size:${joyPx}px" aria-label="Movement Joystick">
             <div class="joy-ring-inner"></div>
             <div id="touch-knob" class="touch-knob"></div>
           </div>
