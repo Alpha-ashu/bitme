@@ -103,8 +103,10 @@ function renderHomePage(ctx: AppContext): string {
               <small class="streak-count">${dailyDone}/${dailyTot || 6} Tasks</small>
             </button>
           ` : ''}
-          <div class="hero-ctas hero-ctas-single">
-            <button class="btn btn-primary hero-play-btn" data-quick-start="${esc(state.selectedUIMode)}">▶ Play ${esc(UI_MODES[state.selectedUIMode].name)}</button>
+          <div class="hero-mode-bar" data-nav="play" role="button" tabindex="0" title="Selected: ${esc(UI_MODES[state.selectedUIMode].name)}. Tap to switch mode">
+            <span class="hmb-dot"></span>
+            <span class="hmb-text">Ready: <b>${esc(UI_MODES[state.selectedUIMode].name)}</b></span>
+            <span class="hmb-pill">Modes ▾</span>
           </div>
         </div>
 
@@ -1066,6 +1068,13 @@ export function renderAppShell(root: HTMLElement, ctx: AppContext): void {
   const primaryMobileIds = new Set<Page>(['home', 'play', 'story', 'lobby']);
   const isHubActive = !primaryMobileIds.has(state.page);
 
+  const isStoryPage = state.page === 'story';
+  const effectiveModeKey: UIMode = isStoryPage ? 'explorer' : state.selectedUIMode;
+  const curMode = UI_MODES[effectiveModeKey] || UI_MODES['free_roam'];
+  const curModeTag = isStoryPage
+    ? `Stage ${state.explorer?.kingdom?.n || 1}`
+    : curMode.name.replace(' Mode', '').replace(' Battle', '');
+
   let pageHtml = '';
   switch (state.page) {
     case 'home': pageHtml = renderHomePage(ctx); break;
@@ -1119,13 +1128,30 @@ export function renderAppShell(root: HTMLElement, ctx: AppContext): void {
       </div>
 
       <nav class="mobile-bottom-nav" aria-label="Primary navigation">
-        ${([navItems[0], navItems[1], navItems[3], navItems[2]]).map(n => `
-          <button class="mob-nav-btn ${state.page === n.id ? 'active' : ''}" data-nav="${n.id}">
-            <span>${n.icon}</span><small>${n.label}</small>
+        <button class="mob-nav-btn ${state.page === 'home' ? 'active' : ''}" data-nav="home">
+          <span>${svgNavIcon('home', 20)}</span><small>Home</small>
+        </button>
+        <button class="mob-nav-btn ${state.page === 'play' ? 'active' : ''}" data-nav="play">
+          <span>${svgNavIcon('play', 20)}</span><small>Modes</small>
+        </button>
+
+        <!-- CENTER FLOATING 3D PLAY ACTION BUTTON -->
+        <div class="mob-play-fab-slot">
+          <button class="mob-play-fab" id="bottom-floating-play-btn" data-quick-start="${esc(effectiveModeKey)}" aria-label="Play ${esc(curMode.name)}" title="Start ${esc(curMode.name)}">
+            <span class="fab-halo-ring"></span>
+            <span class="fab-core-disc">
+              <span class="fab-play-glyph">▶</span>
+              <span class="fab-play-text">PLAY</span>
+            </span>
+            <span class="fab-mode-tag">${esc(curModeTag)}</span>
           </button>
-        `).join('')}
+        </div>
+
+        <button class="mob-nav-btn ${state.page === 'story' ? 'active' : ''}" data-nav="story">
+          <span>${svgNavIcon('story', 20)}</span><small>Story</small>
+        </button>
         <button class="mob-nav-btn ${isHubActive ? 'active' : ''}" id="mob-hub-btn">
-          <span>${svgNavIcon('hub', 19)}</span><small>Hub</small>
+          <span>${svgNavIcon('hub', 20)}</span><small>Hub</small>
         </button>
       </nav>
     </div>
