@@ -196,8 +196,8 @@ export function patchHeartHudBar(root: HTMLElement, ctx: AppContext): void {
   }
 }
 
-function svgMiniMapBtnIcon(): string {
-  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>`;
+function svgMiniMapBtnIcon(size = 22): string {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>`;
 }
 
 function svgMiniZoomBtnIcon(): string {
@@ -399,27 +399,15 @@ export function renderGameplayScreen(
           <button id="desk-mini" class="btn btn-sm btn-soft">Map [M]</button>
         </div>
 
-        <!-- Mobile / Tablet Touch Controls: Divided Left & Right Powers + Precision Joystick -->
+        <!-- Mobile / Tablet Touch Controls: Dedicated MAP, Center Joystick, and Right BOOST -->
         <div class="touch-hud touch-divided layout-${layoutPreset} ${rightSide ? 'swap-sides' : ''}" style="--joy-size:${joyPx}px;--joy-opacity:${joyOpacity};--btn-scale:${btnScale};--btn-opacity:${btnOpacity}">
           <div class="touch-side-left">
-            <div class="touch-util-row">
-              ${showMapBtn ? `
-                <button id="touch-mini" class="touch-btn sm" aria-label="Arena Map (Safe Pause)">
-                  ${svgMiniMapBtnIcon()}
-                  <span class="tbtn-micro">MAP</span>
-                </button>
-              ` : ''}
-              ${showZoomBtn ? `
-                <button id="touch-zoom" class="touch-btn sm" aria-label="Camera Zoom">
-                  ${svgMiniZoomBtnIcon()}
-                  <span id="touch-zoom-label" class="tbtn-micro" style="font-size:7px;line-height:1;opacity:0.8">${zoomLbl}</span>
-                </button>
-              ` : ''}
-            </div>
-            <button id="touch-ability" class="touch-btn ${abCd > 0 ? 'cd' : ''} ${shieldSec > 0 ? 'buff-active' : ''}" aria-label="Guard Shield Power">
-              ${svgFoodPreview('shield', 28)}
-              <small id="ability-cd">${shieldSec > 0 ? `${shieldSec}s` : abCd > 0 ? `${abCd}s` : 'GUARD'}</small>
-            </button>
+            ${showMapBtn ? `
+              <button id="touch-mini" class="touch-btn touch-btn-map" aria-label="Arena Map (Safe Pause)" title="Open Tactical Map">
+                ${svgMiniMapBtnIcon(22)}
+                <small>MAP</small>
+              </button>
+            ` : ''}
           </div>
 
           <div id="touch-joystick" class="touch-joystick ${isFloatingJoy ? 'floating-mode' : ''}" style="--joy-size:${joyPx}px" aria-label="Movement Joystick">

@@ -135,14 +135,15 @@ function renderHomePage(ctx: AppContext): string {
       <div class="quick-mode-grid" style="grid-template-columns:repeat(${Math.min(slice.length || 2, perPage === 6 ? 3 : 2)}, minmax(0,1fr))">
         ${slice.map(id => {
           const m = UI_MODES[id];
+          const isSelected = ctx.state.selectedUIMode === id;
           return `
-            <button type="button" class="quick-mode-pill ${ctx.state.selectedUIMode === id ? 'selected' : ''}" data-quick-start="${id}">
+            <button type="button" class="quick-mode-pill ${isSelected ? 'selected' : ''}" data-select-mode="${id}" role="radio" aria-checked="${isSelected}" title="Select ${esc(m.name)}">
               ${svgModeBadge(id, tier === 'tiny' || tier === 'landscape' ? 30 : 34)}
               <span class="qm-info">
                 <strong class="uname-ellipsis">${esc(m.name)}</strong>
                 <small class="uname-ellipsis">${esc(m.tag)}</small>
               </span>
-              <span class="qm-go">▶</span>
+              <span class="qm-go ${isSelected ? 'selected' : ''}">${isSelected ? '✓' : '●'}</span>
             </button>
           `;
         }).join('')}
@@ -780,11 +781,7 @@ function renderSettingsPage(ctx: AppContext): string {
         </div>
         <div class="spc-stage preview-layout-${layout}">
           <div class="spc-side-left">
-            <div class="spc-util-row">
-              ${st.showMapBtn !== false ? '<span class="spc-btn sm">🗺️</span>' : ''}
-              ${st.showZoomBtn !== false ? '<span class="spc-btn sm">🔍</span>' : ''}
-            </div>
-            <span class="spc-btn ability" style="transform:scale(${btnScale});opacity:${btnOpacity}">🛡️</span>
+            ${st.showMapBtn !== false ? '<span class="spc-btn map" style="transform:scale(' + btnScale + ');opacity:' + btnOpacity + '">🗺️</span>' : ''}
           </div>
           <div class="spc-joy-wrap" style="width:${previewJoyPx}px;height:${previewJoyPx}px;opacity:${joyOpacity}">
             <div class="spc-joy-knob"></div>

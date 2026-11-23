@@ -909,16 +909,24 @@ p, small, span, label, th, td, h1, h2, h3, h4, button, strong {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #fef3c7;
-  border: 1.5px solid #f59e0b;
-  color: #92400e;
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+  color: #94a3b8;
   display: grid;
   place-items: center;
   font-size: 10px;
   font-weight: 900;
   flex-shrink: 0;
+  transition: all 0.15s ease;
 }
-.quick-mode-pill.selected .qm-go { background: #10b981; border-color: #047857; color: #ffffff; }
+.quick-mode-pill.selected .qm-go,
+.quick-mode-pill .qm-go.selected,
+.quick-mode-pill .qm-go.is-selected {
+  background: #10b981;
+  border-color: #047857;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
+}
 
 /* ── Live Realm Campaign Banner (Eliminating Empty Void) ──── */
 .home-quest-banner {
@@ -2389,7 +2397,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   .npc-prompt { top: calc(54px + var(--safe-t)); bottom: auto; padding: 6px 12px; font-size: 12px; }
   .touch-joystick { width: clamp(72px, calc(var(--joy-size, 112px) * 0.78), 112px); height: clamp(72px, calc(var(--joy-size, 112px) * 0.78), 112px); }
   .touch-btn { width: 48px; height: 48px; font-size: 15px; }
-  .touch-btn.boost { width: 56px; height: 56px; font-size: 20px; }
+  .touch-btn.boost,
+  .touch-btn-map { width: 52px; height: 52px; }
   .modal-creative { max-width: 560px; padding: 14px 12px 10px; gap: 5px; }
   .modal-hero-art { gap: 8px; }
   .modal-hero-art .scroll-hero { width: 44px; height: 44px; }
@@ -2580,6 +2589,43 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   border: 2px solid #6fd39e;
   box-shadow: inset 0 2px 0 #ffffff, 0 3.5px 0 #4cc38a, 0 6px 12px rgba(11, 61, 40, 0.14);
 }
+.touch-hud.touch-divided #touch-mini,
+.touch-btn-map {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ecfdf5 0%, #a7f3d0 100%);
+  border: 2.5px solid #059669;
+  box-shadow: inset 0 3px 0 #ffffff, 0 4.5px 0 #047857, 0 9px 20px rgba(5, 150, 105, 0.28);
+  color: #064e3b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.touch-hud.touch-divided #touch-mini svg,
+.touch-btn-map svg {
+  color: #047857;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8));
+}
+.touch-hud.touch-divided #touch-mini small,
+.touch-btn-map small {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 9.5px;
+  font-weight: 900;
+  color: #064e3b;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+.touch-hud.touch-divided #touch-mini:active,
+.touch-btn-map:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 1.5px 0 #ffffff, 0 1.5px 0 #047857, 0 4px 8px rgba(5, 150, 105, 0.2);
+}
 .touch-hud.touch-divided #touch-ability {
   background: linear-gradient(180deg, #f0f9ff 0%, #bae6fd 100%);
   border: 2.5px solid #0284c7;
@@ -2652,7 +2698,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: #10b981
   .touch-hud.touch-divided .touch-joystick { width: 82px; height: 82px; }
   .touch-btn { width: 48px; height: 48px; }
   .touch-btn.sm { width: 34px; height: 34px; font-size: 13px; }
-  .touch-btn.boost { width: 54px; height: 54px; }
+  .touch-btn.boost,
+  .touch-btn-map { width: 50px; height: 50px; }
 }
 
 @media (max-height: 520px) {

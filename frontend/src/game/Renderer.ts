@@ -68,6 +68,13 @@ export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private cameraPos = { x: WORLD / 2, y: WORLD / 2 };
   private zoom = 0.45;
+  public lastMinimapRect: { x: number; y: number; size: number } | null = null;
+
+  public isPointInMinimap(px: number, py: number): boolean {
+    if (!this.lastMinimapRect) return false;
+    const { x, y, size } = this.lastMinimapRect;
+    return px >= x && px <= x + size && py >= y && py <= y + size;
+  }
   private userZoom = 0.45;            // §5 player-controlled zoom (default: Far view 0.45 = 2.2x wider map FOV)
   private readonly ZOOM_MIN = 0.30;  // most zoomed OUT (Ultra Wide)
   private readonly ZOOM_MAX = 1.0;   // most zoomed IN (Near)
@@ -1017,6 +1024,7 @@ export class Renderer {
       x = onLeft ? margin : vw - size - margin;
       y = vh - size - 112;
     }
+    this.lastMinimapRect = { x, y, size };
 
     ctx.save();
     ctx.shadowColor = 'rgba(11, 61, 40, 0.16)';

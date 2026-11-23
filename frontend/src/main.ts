@@ -1286,6 +1286,11 @@ class AnacondaParkApp {
           return;
         }
         const t = e.touches[0];
+        if (this.renderer?.isPointInMinimap(t.clientX, t.clientY)) {
+          this.ctx.openTacticalMap();
+          triggerHaptics(15);
+          return;
+        }
         if ((e.target as HTMLElement)?.closest('button, .touch-btn, .hud-board, .npc-prompt, .desk-actions')) return;
         const joyEl = document.getElementById('touch-joystick');
         if (!joyEl) return;
@@ -1507,6 +1512,13 @@ class AnacondaParkApp {
             this.renderer.setNpcQuotas(this.state.npcQuotas);
             this.applySettingsToDom();
             this.applyMatchTheme();
+
+            canvas.addEventListener('click', (e) => {
+              if (this.renderer?.isPointInMinimap(e.clientX, e.clientY)) {
+                this.ctx.openTacticalMap();
+                triggerHaptics(15);
+              }
+            });
           },
           onBindTouchHud: () => this.bindTouchHudButtons(),
         });
