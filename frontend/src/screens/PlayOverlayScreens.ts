@@ -189,7 +189,8 @@ export function patchHeartHudBar(root: HTMLElement, ctx: AppContext): void {
   }
   const shardEl = root.querySelector('#hud-heart-shards') as HTMLElement | null;
   if (shardEl) {
-    const showShard = hs.hearts < hs.maxHearts || hs.heartShards > 0;
+    // Only visible when player is in danger (2 hearts or fewer remaining)
+    const showShard = hs.hearts <= 2;
     shardEl.style.display = showShard ? 'inline-flex' : 'none';
     const label = `${hs.heartShards}/${hs.shardsRequired}`;
     const txtEl = shardEl.querySelector('strong');
@@ -259,7 +260,8 @@ export function renderGameplayScreen(
   const timerPrefix = mode === 'boss' ? 'BOSS' : mode === 'team' ? 'TEAM' : mode === 'battle_royale' ? 'STORM' : 'TIME';
   const hs = ctx.getLiveHeartState();
   const hearts = buildFiveHeartsBarContent(hs);
-  const showShards = hs.hearts < hs.maxHearts || hs.heartShards > 0;
+  // Shard recharge chip (e.g. 1/30) is only visible when player is in danger (2 hearts or fewer left)
+  const showShards = hs.hearts <= 2;
 
   const eventBanner = st?.currentEvent
     ? `<div class="hud-event-pill">${esc(String(st.currentEvent.title || '').replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, ''))}</div>`
