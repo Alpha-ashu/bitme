@@ -3,7 +3,7 @@ import { adSlotPlaceholder, mountAdSlots } from '../components/AdBanner';
 import { imgBundleSprite, svgCloseX, svgFoodPreview, svgModeBadge, svgNavIcon, svgStarCoin, svgStarsRating } from '../components/CartoonUi';
 import { renderNpcEncounterPopup, renderQuizModal } from '../components/QuizModal';
 import { ads } from '../game/AdService';
-import { GameStateTick, WORLD } from '../game/GameClient';
+import { GameStateTick, HeartStateData, WORLD } from '../game/GameClient';
 import { audio } from '../game/AudioSystem';
 import { esc, safeUrl } from '../utils/escapeHtml';
 import { AppContext, EVO_LADDER, UI_MODES } from './types';
@@ -25,6 +25,7 @@ function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }
   const walletStars = ctx.state.profile?.stars ?? 0;
   const totalItems = ms.totalItems || 0;
   const mode = ctx.state.selectedUIMode;
+  const hs = ctx.getLiveHeartState();
   const aliveCount = st?.snakes?.filter((s: any) => s.alive)?.length || 1;
   const board = st?.leaderboard || [];
   const rankIdx = board.length && me?.id ? (board.findIndex((e: any) => e.id === me.id) + 1) : 0;
@@ -36,7 +37,7 @@ function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }
 
   const chips: Array<[string, number, string]> = [
     ['farm_cherry_twin', (ms.cherry || 0) + (ms.apple || 0), 'Fruit'],
-    ['ui_star_wood', (ms.star || 0) + (ms.super_star || 0), 'Stars'],
+    ['ui_heart_wood', (ms.heart || 0), 'Hearts'],
     ['gem_cyan_rect', (ms.crystal || 0) + (ms.frog || 0), 'Gems'],
     ['ui_bolt_wood', (ms.speed || 0) + (ms.shield || 0) + (ms.mushroom || 0), 'Boosts'],
   ];
@@ -52,9 +53,9 @@ function renderLootAndTasksSummary(ctx: AppContext, opts?: { compact?: boolean }
           <small style="display:flex;align-items:center;justify-content:center;gap:3px">${svgStarCoin(11)} SCORE</small>
           <b>${fmtNum(score)}</b>
         </div>
-        <div class="ps-stat stat-stars">
-          <small>STARS</small>
-          <b>${fmtNum(walletStars)}</b>
+        <div class="ps-stat stat-hearts">
+          <small>HEARTS</small>
+          <b>${hs.hearts}/${hs.maxHearts}</b>
         </div>
         <div class="ps-stat stat-items">
           <small>ITEMS</small>
@@ -700,15 +701,36 @@ export function renderPauseModal(root: HTMLElement, ctx: AppContext) {
   root.querySelector('#pause-quit')?.addEventListener('click', () => void ctx.abandonMatch());
 }
 
+function renderKnockoutHeartsHtml(hs: HeartStateData): string {
+  const maxH = hs.maxHearts || 5;
+  const curH = Math.max(0, Math.min(maxH, hs.hearts));
+  let html = '';
+  for (let i = 0; i < maxH; i++) {
+    const isFull = i < curH;
+    const isJustLost = i === curH;
+    html += `
+      <div class="ko-heart-slot ${isFull ? 'full' : isJustLost ? 'just-lost' : 'empty'}" title="${isFull ? 'Heart Active' : isJustLost ? 'Lost Heart (-1)' : 'Depleted Heart'}">
+        <svg class="ko-heart-svg" width="34" height="34" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+            fill="${isFull ? '#ef4444' : isJustLost ? 'rgba(239, 68, 68, 0.22)' : 'rgba(148, 163, 184, 0.2)'}"
+            stroke="${isFull ? '#991b1b' : isJustLost ? '#ef4444' : '#94a3b8'}"
+            stroke-width="2"
+            ${!isFull ? 'stroke-dasharray="3 2"' : ''}/>
+          ${isFull ? '<path d="M7.5 6.4c-.9 0-1.7.7-1.7 1.7" stroke="rgba(255,255,255,0.85)" stroke-width="1.8" stroke-linecap="round" fill="none"/>' : ''}
+        </svg>
+        ${isJustLost ? '<span class="ko-lost-badge">-1</span>' : ''}
+      </div>
+    `;
+  }
+  return html;
+}
+
 export function renderRespawnModal(root: HTMLElement, ctx: AppContext) {
-  const stars = ctx.state.profile?.stars ?? 0;
   const tickets = ctx.state.profile?.tickets ?? 0;
-  const starCost = ctx.state.respawnCostStars ?? 20;
   const me = ctx.state.lastSnake;
   const runScore = Math.round(me?.score || 0);
   const runKills = me?.kills || 0;
-  const totalItems = ctx.state.matchStats?.totalItems || 0;
-  const earnedRunStars = computeRunStars(runScore, runKills, totalItems, false);
+  const hs = ctx.getLiveHeartState();
 
   root.innerHTML = `
     <div class="modal-backdrop">
@@ -717,28 +739,73 @@ export function renderRespawnModal(root: HTMLElement, ctx: AppContext) {
         <div class="modal-hero-art">
           ${imgBundleSprite('ui_scroll_lose', 74, 'scroll-hero')}
           <div class="modal-hero-meta">
-            ${svgStarsRating(earnedRunStars, 40)}
+            <div class="knockout-hearts-lockup">
+              <div class="knockout-hearts-row">
+                ${renderKnockoutHeartsHtml(hs)}
+              </div>
+              <div class="knockout-heart-notice ${hs.hearts === 0 ? 'out-of-hearts' : ''}">
+                <span class="khn-badge">${hs.hearts > 0 ? '-1 ❤️ Lost' : '💔 0 Hearts'}</span>
+                <span class="khn-text"><b>${hs.hearts}/${hs.maxHearts}</b> Hearts Remaining</span>
+                ${hs.nextRestoreInSec > 0 ? `<span class="khn-timer">⏳ +1 in <b id="rsp-heart-timer">${fmtHeartMMSS(hs.nextRestoreInSec)}</b></span>` : ''}
+              </div>
+            </div>
             <div class="run-score-pill">Score <b>${fmtNum(runScore)}</b> · Kills <b>${runKills}</b></div>
           </div>
         </div>
         ${renderLootAndTasksSummary(ctx, { compact: true })}
         <div class="modal-stack">
-          <button id="rsp-free" class="btn btn-primary btn-block">${imgBundleSprite('ui_play_wood', 18)} Free Respawn</button>
+          ${hs.hearts > 0 ? `
+            <button id="rsp-free" class="btn btn-primary btn-block rsp-btn-active">${imgBundleSprite('ui_play_wood', 18)} Free Respawn (${hs.hearts} ❤️ Left)</button>
+          ` : `
+            <button id="rsp-free" class="btn btn-block rsp-btn-cooldown" disabled>
+              ⏳ Free Respawn in <span id="rsp-btn-timer">${fmtHeartMMSS(hs.nextRestoreInSec)}</span>
+            </button>
+          `}
           <div class="rsp-split-row">
-            <button id="rsp-stars" class="btn btn-gold" ${stars < starCost ? 'disabled' : ''}>${imgBundleSprite('ui_star_wood', 16)} Instant (${starCost}★)</button>
-            <button id="rsp-ticket" class="btn btn-soft" ${tickets < 1 ? 'disabled' : ''}>${imgBundleSprite('pirate_map', 16)} Ticket (${tickets})</button>
-          </div>
-          <div class="rsp-split-row">
-            <button id="rsp-ad" class="btn btn-blue">Watch Ad · Revive</button>
+            <button id="rsp-ad" class="btn btn-blue">📺 Watch Ad · Revive (+1 ❤️)</button>
+            ${tickets > 0 ? `<button id="rsp-ticket" class="btn btn-soft">${imgBundleSprite('pirate_map', 16)} Ticket (${tickets})</button>` : ''}
             <button id="rsp-finish" class="btn btn-danger">Finish Run</button>
           </div>
         </div>
       </div>
     </div>
   `;
-  root.querySelector('#rsp-free')?.addEventListener('click', () => ctx.requestRespawn('wait'));
-  root.querySelector('#rsp-stars')?.addEventListener('click', () => ctx.requestRespawn('stars'));
-  root.querySelector('#rsp-ticket')?.addEventListener('click', () => ctx.requestRespawn('ticket'));
+
+  let intervalId: number | null = window.setInterval(() => {
+    if (!root.querySelector('.knockout-hearts-lockup')) {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = null;
+      return;
+    }
+    const liveHs = ctx.getLiveHeartState();
+    const mmss = fmtHeartMMSS(liveHs.nextRestoreInSec);
+    const heartTimer = root.querySelector('#rsp-heart-timer');
+    if (heartTimer) heartTimer.textContent = mmss;
+    const btnTimer = root.querySelector('#rsp-btn-timer');
+    if (btnTimer) btnTimer.textContent = mmss;
+
+    if (hs.hearts === 0 && liveHs.hearts > 0) {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = null;
+      renderRespawnModal(root, ctx);
+    }
+  }, 1000);
+
+  const cleanup = () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  };
+
+  root.querySelector('#rsp-free')?.addEventListener('click', () => {
+    cleanup();
+    ctx.requestRespawn('wait');
+  });
+  root.querySelector('#rsp-ticket')?.addEventListener('click', () => {
+    cleanup();
+    ctx.requestRespawn('ticket');
+  });
   root.querySelector('#rsp-ad')?.addEventListener('click', async () => {
     const start = await ads.startRewardedWatch();
     if (!start.ok || !start.tokenId) {
@@ -746,10 +813,12 @@ export function renderRespawnModal(root: HTMLElement, ctx: AppContext) {
       return;
     }
     showRewardedWatchDialog(root, ctx, start.tokenId, start.minWatchMs, start.ad, (tok) => {
+      cleanup();
       ctx.requestRespawn('ad', tok);
     });
   });
   root.querySelector('#rsp-finish')?.addEventListener('click', () => {
+    cleanup();
     ctx.setScreen('gameover');
   });
 }

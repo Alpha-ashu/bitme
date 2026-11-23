@@ -460,6 +460,27 @@ class AnacondaParkApp {
     }
   }
 
+  public deductHeartOnDeath() {
+    const hs = this.getLiveHeartState();
+    const before = hs.hearts;
+    const after = Math.max(0, before - 1);
+    const now = Date.now();
+    let nextAt = hs.nextRestoreAtMs;
+    if (before >= hs.maxHearts && after < hs.maxHearts) {
+      nextAt = now + (hs.restoreIntervalSec || 900) * 1000;
+    }
+    const remSec = nextAt > now ? Math.max(1, Math.ceil((nextAt - now) / 1000)) : 0;
+    this.state.heartState = {
+      ...hs,
+      hearts: after,
+      nextRestoreAtMs: nextAt,
+      nextRestoreInSec: remSec,
+    };
+    if (getPlayerToken()) {
+      void api('/api/player/hearts/deduct', { method: 'POST', body: JSON.stringify({ count: 1, reason: 'knockout' }) });
+    }
+  }
+
   public setQuizActive(active: boolean) {
     this.client.setQuizMode(active);
   }
@@ -899,6 +920,9 @@ class AnacondaParkApp {
     this.client.onRespawnResult = (r) => {
       if (r.success) {
         this.lastAlive = true;
+        if (r.method === 'ad') {
+          this.state.heartState.hearts = Math.min(this.state.heartState.maxHearts, this.state.heartState.hearts + 1);
+        }
         this.setScreen('play');
         this.startRenderLoop();
       } else {
@@ -1104,6 +1128,7 @@ class AnacondaParkApp {
     if (me && !me.isAlive && this.lastAlive && this.state.screen === 'play') {
       this.lastAlive = false;
       audio.playDeath();
+      this.deductHeartOnDeath();
       const noRespawn = this.state.selectedUIMode === 'battle_royale' || this.state.selectedUIMode === 'nokia' || this.state.selectedUIMode === 'boss';
       if (noRespawn) {
         void this.endMatch(false);

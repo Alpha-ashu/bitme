@@ -159,6 +159,34 @@ export class HeartService {
   }
 
   /**
+   * Add 1 (or more) hearts — e.g. from watching a rewarded revive ad or special item.
+   */
+  public static addHeart(
+    userId: string,
+    amount = 1,
+    nowMs = Date.now()
+  ): { state: HeartState; added: number } {
+    const cur = this.getHeartState(userId, nowMs);
+    const row = this.ensureRow(userId, nowMs);
+    if (!row) return { state: cur, added: 0 };
+    const before = cur.hearts;
+    const after = Math.min(MAX_HEARTS, before + Math.max(1, Math.round(amount)));
+    const added = after - before;
+    let anchorMs = Math.max(0, Number(row.next_restore_anchor_ms) || 0);
+    if (after >= MAX_HEARTS) {
+      anchorMs = 0;
+    }
+    this.saveRow(userId, after, cur.heartShards, anchorMs, nowMs);
+    return {
+      state: this.toState(after, cur.heartShards, anchorMs, nowMs),
+      added,
+    };
+  }
+
+  public static deductHearts = HeartService.deductHeart;
+  public static addHearts = HeartService.addHeart;
+
+  /**
    * Collect in-game heart pickups toward the 30-heart single-heart recharge rule.
    * Every 30 collected hearts restores +1 full heart (when below max 5).
    */

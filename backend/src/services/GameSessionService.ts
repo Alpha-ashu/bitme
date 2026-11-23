@@ -907,6 +907,7 @@ export class GameSessionService {
 
   private onPickupCallback?: (userId: string, foodId: string, foodType: string, updatedMissions: any[]) => void;
   private onHeartUpdateCallback?: (userId: string, heartState: HeartState, rechargedCount: number) => void;
+  private onPlayerDeathCallback?: (userId: string) => void;
 
   public setOnPickupCallback(cb: (userId: string, foodId: string, foodType: string, updatedMissions: any[]) => void) {
     this.onPickupCallback = cb;
@@ -914,6 +915,10 @@ export class GameSessionService {
 
   public setOnHeartUpdateCallback(cb: (userId: string, heartState: HeartState, rechargedCount: number) => void) {
     this.onHeartUpdateCallback = cb;
+  }
+
+  public setOnPlayerDeathCallback(cb: (userId: string) => void) {
+    this.onPlayerDeathCallback = cb;
   }
 
   private applyFood(snake: SnakeState, food: FoodItem) {
@@ -1106,6 +1111,7 @@ export class GameSessionService {
 
     if (!snake.userId.startsWith('bot_') && !snake.isBoss) {
       db.updateLeaderboard(snake.userId, snake.displayName, Math.round(snake.score), false);
+      this.onPlayerDeathCallback?.(snake.userId);
     } else if (!snake.isBoss && this.state.mode !== 'battle_royale') {
       // Respawn bots to keep casual/event/team worlds alive (never in Battle Royale Last Snake Standing).
       const t = setTimeout(() => {

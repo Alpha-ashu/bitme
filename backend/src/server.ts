@@ -681,6 +681,13 @@ app.post('/api/player/hearts/collect', writeLimiter, (req, res) => {
   res.json({ ok: true, heartState: r.state, rechargedCount: r.rechargedCount, shardsAdded: r.shardsAdded });
 });
 
+app.post('/api/player/hearts/deduct', writeLimiter, (req, res) => {
+  const a = auth(req, res); if (!a) return;
+  const count = Math.max(1, Math.min(5, Math.floor(Number(req.body?.count) || 1)));
+  const r = HeartService.deductHeart(a.userId, count);
+  res.json({ ok: true, heartState: r.state, deducted: r.deducted });
+});
+
 app.get('/api/adventure/level/:levelNumber', (req, res) => {
   const a = auth(req, res); if (!a) return;
   const lvl = Math.max(1, Math.min(1000, Math.floor(Number(req.params.levelNumber) || 1)));
@@ -1561,6 +1568,11 @@ io.on('connection', (socket) => {
       emitToUser(userId, 'heart_state', { heartState, rechargedCount });
     });
 
+    session.setOnPlayerDeathCallback((userId) => {
+      const hr = HeartService.deductHeart(userId, 1);
+      emitToUser(userId, 'heart_state', { heartState: hr.state, deducted: hr.deducted, reason: 'knockout' });
+    });
+
     const snake = session.registerPlayer(a.userId, a.username, skin, false, evolution, region);
     AnalyticsService.track({
       eventType: 'match_start',
@@ -1635,6 +1647,13 @@ io.on('connection', (socket) => {
       const verified = AdManagerService.consumeRewardToken(user.userId, String(data?.adToken || ''));
       if (!verified.ok) {
         socket.emit('respawn_result', { success: false, message: verified.error });
+        return;
+      }
+      HeartService.addHeart(user.userId, 1);
+    } else if (method === 'wait' || method === 'heart') {
+      const hs = HeartService.getHeartState(user.userId);
+      if (hs.hearts <= 0) {
+        socket.emit('respawn_result', { success: false, message: 'No hearts left! Wait for the 15-minute timer or watch an ad to revive.' });
         return;
       }
     }
