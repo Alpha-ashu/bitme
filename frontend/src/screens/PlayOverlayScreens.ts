@@ -261,68 +261,6 @@ export function renderGameplayScreen(
   const hearts = buildFiveHeartsBarContent(hs);
   const showShards = hs.hearts < hs.maxHearts || hs.heartShards > 0;
 
-  let hudTopHtml = '';
-  if (mode === 'team') {
-    const blue = st?.teamScores?.blue || 0;
-    const red = st?.teamScores?.red || 0;
-    const tot = Math.max(1, blue + red);
-    const bluePct = Math.round((blue / tot) * 100);
-    hudTopHtml = `
-      <header class="hud-top-bar hud-team">
-        <div class="hud-pill-team team-blue"><span>BLUE</span><strong id="tb-blue">${blue}</strong></div>
-        <div class="hud-center-wrap">
-          <div class="tb-bar"><div id="tb-fill" class="tb-bar-blue" style="width:${bluePct}%"></div></div>
-          <div class="hud-team-meta">
-            <span id="tb-myteam">${me?.team === 'red' ? 'RED TEAM' : 'BLUE TEAM'}</span>
-            <span id="tb-timer" class="hud-timer">${fmtTime(initTimerSec)}</span>
-          </div>
-        </div>
-        <div class="hud-pill-team team-red"><strong id="tb-red">${red}</strong><span>RED</span></div>
-        <button id="btn-pause" class="hud-pause-btn" aria-label="Pause">⏸</button>
-      </header>
-      <div class="hud-sub-stats">
-        <span><b id="tb-player-name">${esc(state.profile?.displayName || 'Player')}</b></span>
-        <span>Score <b id="tb-player-score">${fmtNum(score)}</b></span>
-        <span>Kills <b id="tb-player-kills">${kills}</b></span>
-        <span>Rank <b id="tb-player-rank">${rankIdx > 0 ? `#${rankIdx}` : '#—'}</b></span>
-      </div>
-    `;
-  } else {
-    hudTopHtml = `
-      <header class="hud-top-bar">
-        <div class="hud-stats-row">
-          <div class="hud-stat primary"><small style="display:flex;align-items:center;gap:4px">${svgStarCoin(13)} SCORE</small><strong id="hv-score">${fmtNum(score)}</strong></div>
-        </div>
-        <div class="hud-stage-wrap">
-          <div class="hud-hp-row">
-            <span>HP ${hp}/${maxHp}</span>
-            <span id="hud-stage">${esc(stage.name)}</span>
-          </div>
-          <div class="hud-bar"><div id="hud-hp-fill" style="width:${Math.round((hp / maxHp) * 100)}%"></div></div>
-        </div>
-        <button id="btn-pause" class="hud-pause-btn" aria-label="Pause">⏸</button>
-      </header>
-    `;
-  }
-
-  const vitalsRowHtml = `
-    <div class="hud-vitals-row ${mode === 'team' ? 'is-team' : ''} ${mode === 'boss' ? 'is-boss' : ''}">
-      <div class="hud-hearts-bar ${hearts.low ? 'low' : ''}" id="hud-hearts-bar" data-hearts="${hearts.key}" aria-label="Hearts ${hs.hearts} of ${hs.maxHearts}">
-        ${hearts.html}
-      </div>
-      <div class="heart-shard-chip" id="hud-heart-shards" style="display:${showShards ? 'inline-flex' : 'none'}" title="Collect 30 in-game hearts to recharge +1 Heart">
-        ${svgHeartIcon('full')}
-        <strong>${hs.heartShards}/${hs.shardsRequired}</strong>
-      </div>
-      ${isTimed ? `
-        <div class="hud-mode-timer ${initTimerSec <= 30 ? 'urgent' : ''}" id="hv-timer-pill">
-          <small>${timerPrefix}</small>
-          <strong id="hv-time">${fmtTime(initTimerSec)}</strong>
-        </div>
-      ` : ''}
-    </div>
-  `;
-
   const eventBanner = st?.currentEvent
     ? `<div class="hud-event-pill">${esc(String(st.currentEvent.title || '').replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+/u, ''))}</div>`
     : '';
@@ -357,6 +295,83 @@ export function renderGameplayScreen(
   const superSec = Math.ceil(me?.superTimer || 0);
   const poisonSec = Math.ceil((me as any)?.poisonTimer || 0);
   const powerPills = buildPowerTimerHtml(shieldSec, speedSec, superSec, poisonSec);
+
+  const vitalsRowHtml = `
+    <div class="hud-vitals-row ${mode === 'team' ? 'is-team' : ''} ${mode === 'boss' ? 'is-boss' : ''}">
+      <div class="hud-hearts-bar ${hearts.low ? 'low' : ''}" id="hud-hearts-bar" data-hearts="${hearts.key}" aria-label="Hearts ${hs.hearts} of ${hs.maxHearts}">
+        ${hearts.html}
+      </div>
+      <div class="heart-shard-chip" id="hud-heart-shards" style="display:${showShards ? 'inline-flex' : 'none'}" title="Collect 30 in-game hearts to recharge +1 Heart">
+        ${svgHeartIcon('full')}
+        <strong>${hs.heartShards}/${hs.shardsRequired}</strong>
+      </div>
+      ${isTimed ? `
+        <div class="hud-mode-timer ${initTimerSec <= 30 ? 'urgent' : ''}" id="hv-timer-pill">
+          <small>${timerPrefix}</small>
+          <strong id="hv-time">${fmtTime(initTimerSec)}</strong>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  let hudTopHtml = '';
+  if (mode === 'team') {
+    const blue = st?.teamScores?.blue || 0;
+    const red = st?.teamScores?.red || 0;
+    const tot = Math.max(1, blue + red);
+    const bluePct = Math.round((blue / tot) * 100);
+    hudTopHtml = `
+      <header class="hud-top-bar hud-unified-bar hud-team">
+        <div class="hud-top-left">
+          <div class="hud-pill-team team-blue"><span>BLUE</span><strong id="tb-blue">${blue}</strong></div>
+        </div>
+        <div class="hud-top-center">
+          <div class="hud-center-wrap">
+            <div class="tb-bar"><div id="tb-fill" class="tb-bar-blue" style="width:${bluePct}%"></div></div>
+            <div class="hud-team-meta">
+              <span id="tb-myteam">${me?.team === 'red' ? 'RED TEAM' : 'BLUE TEAM'}</span>
+              <span id="tb-timer" class="hud-timer">${fmtTime(initTimerSec)}</span>
+            </div>
+          </div>
+          ${vitalsRowHtml}
+          <div class="hud-power-timers" id="hud-power-timers" data-key="${shieldSec}_${speedSec}_${superSec}_${poisonSec}">${powerPills}</div>
+        </div>
+        <div class="hud-top-right">
+          <div class="hud-pill-team team-red"><strong id="tb-red">${red}</strong><span>RED</span></div>
+          ${leaderboardHtml}
+          <button id="btn-pause" class="hud-pause-btn" aria-label="Pause">⏸</button>
+        </div>
+      </header>
+      <div class="hud-sub-stats">
+        <span><b id="tb-player-name">${esc(state.profile?.displayName || 'Player')}</b></span>
+        <span>Score <b id="tb-player-score">${fmtNum(score)}</b></span>
+        <span>Kills <b id="tb-player-kills">${kills}</b></span>
+        <span>Rank <b id="tb-player-rank">${rankIdx > 0 ? `#${rankIdx}` : '#—'}</b></span>
+      </div>
+    `;
+  } else {
+    hudTopHtml = `
+      <header class="hud-top-bar hud-unified-bar">
+        <div class="hud-top-left">
+          <div class="hud-stat primary">
+            <small style="display:inline-flex;align-items:center;gap:3px">${svgStarCoin(12)} SCORE</small>
+            <strong id="hv-score">${fmtNum(score)}</strong>
+          </div>
+        </div>
+        <div class="hud-top-center">
+          ${bossBanner}
+          ${eventBanner}
+          ${vitalsRowHtml}
+          <div class="hud-power-timers" id="hud-power-timers" data-key="${shieldSec}_${speedSec}_${superSec}_${poisonSec}">${powerPills}</div>
+        </div>
+        <div class="hud-top-right">
+          ${leaderboardHtml}
+          <button id="btn-pause" class="hud-pause-btn" aria-label="Pause">⏸</button>
+        </div>
+      </header>
+    `;
+  }
+
   const zoomLbl = ctx.getZoomLabel();
   const inv = state.profile?.inventory || {};
   const ownedBoost = Number(inv.pw_boost || 0);
@@ -371,22 +386,11 @@ export function renderGameplayScreen(
     </div>
   ` : '';
 
-  const hudCenterVitals = `
-    <div class="hud-center-vitals">
-      ${bossBanner}
-      ${eventBanner}
-      ${vitalsRowHtml}
-      <div class="hud-power-timers" id="hud-power-timers" data-key="${shieldSec}_${speedSec}_${superSec}_${poisonSec}">${powerPills}</div>
-    </div>
-  `;
-
   root.innerHTML = `
     <div class="play-viewport">
       <canvas id="game-canvas"></canvas>
       <div class="hud-overlay">
         ${hudTopHtml}
-        ${leaderboardHtml}
-        ${hudCenterVitals}
         <div id="active-quest-hud-slot"></div>
         ${showPowerupBar ? chargeBarHtml : ''}
         <div id="npc-approach-chip-slot"></div>
